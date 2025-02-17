@@ -126,6 +126,168 @@ class TwoPortComponent(BaseComponent):
         self._m_flow = m_flow
 
 
+class ThreePortComponent(BaseComponent):
+    """
+    Component with three ports, typically two inputs and one output
+
+    Properties:
+         state_primary (ThermodynamicState):
+             Property for accessing and setting the primary inlet state of the component.
+         state_secondary (ThermodynamicState):
+             Property for accessing and setting the secondary inlet state of the component.
+         state_output (ThermodynamicState):
+             Property for accessing and setting the output state of the component.
+         m_flow (float):
+             Property for accessing and setting the mass flow rate through the component.
+         med_prop (MedProp):
+             Property for accessing and setting the property wrapper for the working fluid.k
+    """
+
+    def __init__(self):
+        """
+        initialize the ThreePortComponent
+        """
+        super(ThreePortComponent, self).__init__()
+        self._state_primary: ThermodynamicState = None
+        self._state_secondary: ThermodynamicState = None
+        self._state_outlet: ThermodynamicState = None
+        self._m_flow_primary: float = None
+        self._m_flow_secondary: float = None
+        self._m_flow_outlet: float = None
+
+    @property
+    def state_primary(self) -> ThermodynamicState:
+        """
+        Get or set the state of the component
+        on the primary inlet.
+
+        Returns:
+            ThermodynamicState: Primary inlet state of the component.
+        """
+        return self._state_primary
+
+    @state_primary.setter
+    def state_primary(self, state_primary: ThermodynamicState):
+        """
+        Set the state of the component
+        on the primary inlet side.
+
+        Args:
+            state_primary (ThermodynamicState): Primary inlet state to set.
+        """
+        self._state_primary = state_primary
+
+    @property
+    def state_secondary(self) -> ThermodynamicState:
+        """
+        Get or set the state of the component
+        on the secondary inlet.
+
+        Returns:
+            ThermodynamicState: Secondary inlet state of the component.
+        """
+        return self._state_secondary
+
+    @state_secondary.setter
+    def state_secondary(self, state_secondary: ThermodynamicState):
+        """
+        Set the state of the component
+        on the secondary inlet side.
+
+        Args:
+            state_secondary (ThermodynamicState): Secondary inlet state to set.
+        """
+        self._state_secondary = state_secondary
+
+    @property
+    def state_outlet(self) -> ThermodynamicState:
+        """
+        Get or set the state of the component
+        on the outlet.
+
+        Returns:
+            ThermodynamicState: Outlet state of the component.
+        """
+        return self._state_outlet
+
+    @state_outlet.setter
+    def state_outlet(self, state_outlet: ThermodynamicState):
+        """
+        Set the state of the component
+        on the outlet side.
+
+        Args:
+            state_outlet (ThermodynamicState): Outlet state to set.
+        """
+        self._state_outlet = state_outlet
+
+    @property
+    def m_flow_primary(self) -> float:
+        """
+        Get or set the mass flow rate through the component
+        on the primary inlet side.
+
+        Returns:
+            float: Mass flow rate through the primary inlet.
+        """
+        return self._m_flow_primary
+
+    @m_flow_primary.setter
+    def m_flow_primary(self, m_flow_primary: float):
+        """
+        Set the mass flow rate through the component
+        on the primary inlet side.
+
+        Args:
+            m_flow_primary (float): Mass flow rate to set.
+        """
+        self._m_flow_primary = m_flow_primary
+
+    @property
+    def m_flow_secondary(self) -> float:
+        """
+        Get or set the mass flow rate through the component
+        on the secondary inlet side.
+
+        Returns:
+            float: Mass flow rate through the secondary inlet.
+        """
+        return self._m_flow_secondary
+
+    @m_flow_secondary.setter
+    def m_flow_secondary(self, m_flow_secondary: float):
+        """
+        Set the mass flow rate through the component
+        on the secondary inlet side.
+
+        Args:
+            m_flow_secondary (float): Mass flow rate to set.
+        """
+        self._m_flow_secondary = m_flow_secondary
+
+    @property
+    def m_flow_outlet(self) -> float:
+        """
+        Get or set the mass flow rate through the component
+        on the outlet side.
+
+        Returns:
+            float: Mass flow rate through the component.
+        """
+        return self._m_flow_outlet
+
+    @m_flow_outlet.setter
+    def m_flow_outlet(self, m_flow_outlet: float):
+        """
+        Set the mass flow rate through the component
+        on the outlet side.
+
+        Args:
+            m_flow_outlet (float): Mass flow rate to set.
+        """
+        self._m_flow_outlet = m_flow_outlet
+
+
 class FourPortComponent(BaseComponent):
     """
     Component with four ports, typically with a
