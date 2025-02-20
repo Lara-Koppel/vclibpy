@@ -154,31 +154,34 @@ class Iteration(Algorithm):
 
             if not isinstance(error_eva, float):
                 print(error_eva)
-            if error_eva < 0:
-                p_1_next = p_1 - step_p1
-                continue
-            else:
-                if step_p1 > self.min_iteration_step:
-                    p_1_next = p_1 + step_p1
-                    step_p1 /= 10
-                    continue
-                elif error_eva > self.max_err and dT_min_eva > self.max_err_dT_min:
-                    step_p1 = 1000
-                    p_1_next = p_1 + step_p1
-                    continue
 
-            if error_con < 0:
-                p_2_next = p_2 + step_p2
-                continue
+            # Check which heat exchanger has the bigger error. The corresponding pressure gets updated
+            if abs(error_eva) > abs(error_con):
+                if error_eva < 0:
+                    p_1_next = p_1 - step_p1
+                    continue
+                else:
+                    if step_p1 > self.min_iteration_step:
+                        p_1_next = p_1 + step_p1
+                        step_p1 /= 10
+                        continue
+                    elif error_eva > self.max_err and dT_min_eva > self.max_err_dT_min:
+                        step_p1 = 1000
+                        p_1_next = p_1 + step_p1
+                        continue
             else:
-                if step_p2 > self.min_iteration_step:
-                    p_2_next = p_2 - step_p2
-                    step_p2 /= 10
+                if error_con < 0:
+                    p_2_next = p_2 + step_p2
                     continue
-                elif error_con > self.max_err and dT_min_con > self.max_err_dT_min:
-                    p_2_next = p_2 - step_p2
-                    step_p2 = 1000
-                    continue
+                else:
+                    if step_p2 > self.min_iteration_step:
+                        p_2_next = p_2 - step_p2
+                        step_p2 /= 10
+                        continue
+                    elif error_con > self.max_err and dT_min_con > self.max_err_dT_min:
+                        p_2_next = p_2 - step_p2
+                        step_p2 = 1000
+                        continue
 
             # If still here, and the values are equal, we may break.
             if p_1 == p_1_next and p_2 == p_2_next:
