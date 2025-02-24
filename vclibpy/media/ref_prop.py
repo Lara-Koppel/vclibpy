@@ -1230,13 +1230,13 @@ class RefProp(MedProp):
         self._flag_warnings = flag
         return 0
 
-    def get_saturated_speed_of_sound(self, p, vapour: bool):
+    def get_saturated_speed_of_sound(self, p, vapor: bool):
         """ Calculate the speed of sound for saturated points based on pressure and quality
 
         Parameters:
         :param float p:
             Pressure in Pa
-        :param boolean vapour:
+        :param boolean vapor:
             Boolean to calculate the speed of sound for either saturated vapour or liquid
         Returns:
         :return float a:
@@ -1246,7 +1246,7 @@ class RefProp(MedProp):
         # Multiplier for pressure since kPa is used in RefProp
         p_multi = 1e-3
         p = p * p_multi
-        if vapour:
+        if vapor:
             q = 1
         else:
             q = 0
