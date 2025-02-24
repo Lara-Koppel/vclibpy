@@ -1229,3 +1229,29 @@ class RefProp(MedProp):
         """
         self._flag_warnings = flag
         return 0
+
+    def get_saturated_speed_of_sound(self, p, vapour: bool):
+        """ Calculate the speed of sound for saturated points based on pressure and quality
+
+        Parameters:
+        :param float p:
+            Pressure in Pa
+        :param boolean vapour:
+            Boolean to calculate the speed of sound for either saturated vapour or liquid
+        Returns:
+        :return float a:
+            Speed of sound in m/s
+        """
+
+        # Multiplier for pressure since kPa is used in RefProp
+        p_multi = 1e-3
+        p = p * p_multi
+        if vapour:
+            q = 1
+        else:
+            q = 0
+        # In case current fluid is mixture you need to transform Q to molar base for RefProp-function
+        if self._mix_flag:
+            q = self._call_refprop("PQMASS", "QMOLE", p, q, i_mass=1).Output[0]
+        tmp = self.rp.PQFLSHdll(p, q, self._mol_frac, 0)
+        return tmp.w
