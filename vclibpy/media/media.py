@@ -202,6 +202,9 @@ class MedProp(abc.ABC):
             cv=0.5 * (tr_pr_in.cv + tr_pr_out.cv),
             state=None)
 
+    def get_saturated_speed_of_sound(self, p, vapor: bool):
+        raise NotImplementedError
+
 
 def get_two_phase_limits(med_prop: MedProp, p_step: int = 1000, p_min: int = int(1e3)) -> List[ThermodynamicState]:
     """
