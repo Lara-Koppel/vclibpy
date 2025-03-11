@@ -60,7 +60,6 @@ class Ejector(ThreePortComponent):
         self.v_step_min = v_step_min
         self.v_step_max = v_step_max
         self.p_throat: float = None  # Throat pressure
-        self.c_throat: float = None  # Speed of sound at throat
         self.state_primary_mixing: ThermodynamicState = None  # Thermodynamic state of primary flow at mixing chamber
         self.state_mixing: ThermodynamicState = None  # Thermodynamic state of mixed flow at mixing chamber
 
@@ -68,15 +67,15 @@ class Ejector(ThreePortComponent):
                     p_3,
                     p_throat_start=None):
 
-        if self.med_prop.fluid_name != "Carbon dioxide":
-            raise NotImplementedError("Current ejector model only valid for Carbon Dioxide")
+        if self.med_prop.fluid_name != "CarbonDioxide":
+            raise NotImplementedError("Current ejector model only valid for CarbonDioxide")
 
         # Starting with calculations inside the primary nozzle
         # 1: Iterate Pressure inside nozzle throat
-        state_throat = self.iterate_throat_pressure(p_throat_start)
+        state_throat, c_throat = self.iterate_throat_pressure(p_throat_start)
 
         # 2: Now that we know p_throat, we can continue with calculating the mass flow through the primary nozzle
-        self.m_flow_primary = math.pi*self.d_throat**2/4*state_throat.d*self.c_throat
+        self.m_flow_primary = math.pi*(self.d_throat*10**-3)**2/4*state_throat.d*c_throat
 
         # Now we can do calculations for the inlet of the mixing-chamber
         # 3: Calculate enthalpy of primary flow at inlet of mixing-chamber
@@ -85,9 +84,9 @@ class Ejector(ThreePortComponent):
         self.state_primary_mixing = self.med_prop.calc_state("PH", self.state_secondary.p, h_primary_mixing)
 
         # 4: Calculate velocity of primary flow at mixing-chamber inlet using energy conservation
-        v_primary_mixing = math.sqrt(self.c_throat**2 + 2*(state_throat.h-self.state_primary_mixing.h +
-                                                           state_throat.p/state_throat.d -
-                                                           self.state_primary_mixing.p/self.state_primary_mixing.d))
+        v_primary_mixing = math.sqrt(c_throat**2 + 2*(state_throat.h-self.state_primary_mixing.h +
+                                                      state_throat.p/state_throat.d -
+                                                      self.state_primary_mixing.p/self.state_primary_mixing.d))
 
         # 5: Calculate flow area occupied by primary nozzle flow at mixing-chamber inlet
         A_primary_mixing = self.m_flow_primary/(self.state_primary_mixing.d*v_primary_mixing)
@@ -99,13 +98,14 @@ class Ejector(ThreePortComponent):
         # For this we have a nonlinear equation system we need to solve numerically
         # 7: Calculate secondary mass flow, thermodynamic state in mixing chamber and at outlet
         #    and velocities in mixing chamber
-        self.iterate_v_secondary_mixing(A_secondary_mixing, v_primary_mixing)
-
+        self.iterate_v_secondary_mixing(A_secondary_mixing, v_primary_mixing, p_3)
+        print(self.m_flow_primary*3600, self.m_flow_secondary*3600)
         return self.m_flow_primary + self.m_flow_secondary
 
     def iterate_v_secondary_mixing(self,
                                    A_secondary_mixing,
                                    v_primary_mixing,
+                                   p_3,
                                    v_secondary_mixing = None):  # Starting value for v_secondary_mixing
         # We start the solving process by guessing the speed of the secondary flow at the mixing chamber inlet
         if v_secondary_mixing is None:
@@ -142,7 +142,7 @@ class Ejector(ThreePortComponent):
                         self.m_flow_secondary*(self.state_secondary.h+0.5*v_secondary_mixing**2)) /
                         (self.m_flow_primary + self.m_flow_secondary) - 0.5*v_mixing**2)
             self.state_mixing = self.med_prop.calc_state("PH", self.state_secondary.p, h_mixing)
-            h_outlet_isentropic = self.med_prop.calc_state("PS", self.state_outlet.p, self.state_mixing.s).h
+            h_outlet_isentropic = self.med_prop.calc_state("PS", p_3, self.state_mixing.s).h
             h_outlet = h_mixing - self.phi_d*(h_mixing-h_outlet_isentropic)
             h_outlet_2 = ((self.m_flow_primary * self.state_primary.h +
                           self.m_flow_secondary * self.state_secondary.h) /
@@ -189,12 +189,11 @@ class Ejector(ThreePortComponent):
                 # The error and step_v_sm are smaller than max_error and v_step_min. We can break.
                 return
 
-
-    def iterate_throat_pressure(self, p_throat_start):
+    def iterate_throat_pressure(self, p_throat_start=None):
 
         if p_throat_start is None:
             # Use correlation from paper to guess first value of p_throat
-            p_throat_start = 1/(0.53 - 0.121*self.state_primary.p**0.5 + 6*10**(-11)*self.state_primary.d**3)
+            p_throat_start = 1e6/(0.53 - 0.121*(self.state_primary.p/1e6)**0.5 + 6e-11*self.state_primary.d**3)
         self.p_throat = p_throat_start
 
         # Setup for iteration
@@ -225,12 +224,17 @@ class Ejector(ThreePortComponent):
             # 1b: Calculate speed of sound for two phase flow inside throat
             # State calculation inside throat
             state_throat = self.med_prop.calc_state("PH", self.p_throat, h_throat)
+
+            if not 0 < state_throat.q < 1:
+                logger.warning("Nozzle throat state not inside two-phase region. Stopping")
+                return
+
             state_throat_vapor = self.med_prop.calc_state("PQ", self.p_throat, 1)
             state_throat_liquid = self.med_prop.calc_state("PQ", self.p_throat, 0)
             # Volume fractions inside throat
-            phi_throat_vapor = ((state_throat_vapor.q/state_throat_vapor.d)/
-                                 ((state_throat_vapor.q/state_throat_vapor.d)+
-                                  (state_throat_liquid.q/state_throat_liquid.d)))
+            phi_throat_vapor = ((state_throat.q/state_throat_vapor.d) /
+                                ((state_throat.q/state_throat_vapor.d) +
+                                 (state_throat.q/state_throat_liquid.d)))
             phi_throat_liquid = 1 - phi_throat_vapor
             # Speed of sound for separate phases
             a_liquid = self.med_prop.get_saturated_speed_of_sound(self.p_throat, False)
@@ -244,24 +248,20 @@ class Ejector(ThreePortComponent):
             # Thermal expansion coefficients
             beta_liquid = self.med_prop.calc_transport_properties(state_throat_liquid).beta
             beta_vapor = self.med_prop.calc_transport_properties(state_throat_vapor).beta
-
             zeta_liquid = state_throat.T*beta_liquid/(state_throat_liquid.d*c_p_liquid)
             zeta_vapor = state_throat.T*beta_vapor/(state_throat_vapor.d*c_p_vapor)
-
-            x_1 = (phi_throat_vapor/(state_throat_vapor.d*a_vapor**2)+phi_throat_liquid /
-                   (state_throat_liquid.d+a_liquid**2))
+            x_1 = (phi_throat_vapor/(state_throat_vapor.d*a_vapor**2) +
+                   phi_throat_liquid/(state_throat_liquid.d*a_liquid**2))
             x_2 = C_p_vapor*C_p_liquid*(zeta_liquid-zeta_vapor)**2 / (C_p_vapor+C_p_liquid)
             # Speed of sound for two phase flow
-            self.c_throat = (state_throat.d*x_1 + (state_throat.d/state_throat.T)*x_2)**-0.5
-
+            c_throat = (state_throat.d*x_1 + (state_throat.d/state_throat.T)*x_2)**-0.5
             # 1c: Calculate specific enthalpy using energy balance - assume Ma_throat = 1
             Q_NE = 8629*math.e**(-10*state_throat.q)  # Correlation for non-equilibrium phase change
-            h_throat_2 = self.state_primary.h - self.c_throat**2/2 + Q_NE
+            h_throat_2 = self.state_primary.h - c_throat**2/2 + Q_NE
 
             # Calculate error between two calculations for h_throat
             error_h_throat = (h_throat_2/h_throat-1)*100
             error_h_throat_history.append(error_h_throat)
-
             if abs(error_h_throat) > self.max_err or step_p_throat > self.min_iteration_step:
                 # In the first two iteration steps we need to find out in which direction to adjust p_throat
                 if num_iterations == 1:
@@ -299,4 +299,4 @@ class Ejector(ThreePortComponent):
                         continue
             else:
                 # The error and step_p_throat are smaller than max_error and min_iteration_step. We can break.
-                return state_throat
+                return state_throat, c_throat
