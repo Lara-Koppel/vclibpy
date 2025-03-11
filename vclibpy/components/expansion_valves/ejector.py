@@ -8,7 +8,6 @@ import math
 import numpy
 
 from vclibpy.components.component import ThreePortComponent
-from vclibpy.flowsheets.ejector_cycle import BaseEjectorCycle
 from vclibpy.media import ThermodynamicState
 
 
