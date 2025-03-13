@@ -59,7 +59,7 @@ class Ejector(ThreePortComponent):
         self.phi_d = phi_d
         self.v_step_min = v_step_min
         self.v_step_max = v_step_max
-        self.p_throat: float = None  # Throat pressure
+        self.state_throat: ThermodynamicState = None
         self.state_primary_mixing: ThermodynamicState = None  # Thermodynamic state of primary flow at mixing chamber
         self.state_mixing: ThermodynamicState = None  # Thermodynamic state of mixed flow at mixing chamber
 
@@ -72,20 +72,24 @@ class Ejector(ThreePortComponent):
 
         # Starting with calculations inside the primary nozzle
         # 1: Iterate Pressure inside nozzle throat
-        state_throat, c_throat = self.iterate_throat_pressure(p_throat_start)
+        self.state_throat, c_throat = self.iterate_throat_pressure(p_throat_start)
 
         # 2: Now that we know p_throat, we can continue with calculating the mass flow through the primary nozzle
-        self.m_flow_primary = math.pi*(self.d_throat*10**-3)**2/4*state_throat.d*c_throat
+        self.m_flow_primary = math.pi*(self.d_throat*10**-3)**2/4*self.state_throat.d*c_throat
+        print(f"m_flow_primary = π * ({self.d_throat} * 10^-3)^2 / 4 * {self.state_throat.d} * {c_throat}")
+        print(f"Calculated m_flow_primary: {self.m_flow_primary*3600}kg/h")
+        print(self.state_throat)
+        return
 
         # Now we can do calculations for the inlet of the mixing-chamber
         # 3: Calculate enthalpy of primary flow at inlet of mixing-chamber
-        h_primary_mixing_isentropic = self.med_prop.calc_state("PS", self.state_secondary.p, state_throat.s).h
-        h_primary_mixing = state_throat.h - self.phi_n*(state_throat.h-h_primary_mixing_isentropic)
+        h_primary_mixing_isentropic = self.med_prop.calc_state("PS", self.state_secondary.p, self.state_throat.s).h
+        h_primary_mixing = self.state_throat.h - self.phi_n*(self.state_throat.h-h_primary_mixing_isentropic)
         self.state_primary_mixing = self.med_prop.calc_state("PH", self.state_secondary.p, h_primary_mixing)
 
         # 4: Calculate velocity of primary flow at mixing-chamber inlet using energy conservation
-        v_primary_mixing = math.sqrt(c_throat**2 + 2*(state_throat.h-self.state_primary_mixing.h +
-                                                      state_throat.p/state_throat.d -
+        v_primary_mixing = math.sqrt(c_throat**2 + 2*(self.state_throat.h-self.state_primary_mixing.h +
+                                                      self.state_throat.p/self.state_throat.d -
                                                       self.state_primary_mixing.p/self.state_primary_mixing.d))
 
         # 5: Calculate flow area occupied by primary nozzle flow at mixing-chamber inlet
@@ -109,7 +113,7 @@ class Ejector(ThreePortComponent):
                                    v_secondary_mixing = None):  # Starting value for v_secondary_mixing
         # We start the solving process by guessing the speed of the secondary flow at the mixing chamber inlet
         if v_secondary_mixing is None:
-            v_secondary_mixing = 5.00 #ToDO: find out how to guess v_sm
+            v_secondary_mixing = 150.00 #ToDO: find out how to guess v_sm
 
         # Setup for iteration
         error_h_outlet_history = []
@@ -149,8 +153,9 @@ class Ejector(ThreePortComponent):
                           (self.m_flow_primary + self.m_flow_secondary))
             error_h_outlet = (h_outlet_2/h_outlet-1)*100
             error_h_outlet_history.append(error_h_outlet)
+            print(f"Iteration {num_iterations}: v_secondary_mixing = {v_secondary_mixing}; v_mixing = {v_mixing}; error_h_outlet = {error_h_outlet}")
 
-            if abs(error_h_outlet)>self.max_err or step_v_sm > self.v_step_min:
+            if abs(error_h_outlet) > self.max_err or step_v_sm > self.v_step_min:
                 # In the first two iteration steps we need to find out in which direction to adjust v_secondary_mixing
                 if num_iterations == 1:
                     # Assume, that we have to increase v_secondary_mixing to decrease the value of the error
@@ -187,6 +192,7 @@ class Ejector(ThreePortComponent):
                         continue
             else:
                 # The error and step_v_sm are smaller than max_error and v_step_min. We can break.
+                self.state_outlet = self.med_prop.calc_state("PH", p_3, h_outlet)
                 return
 
     def iterate_throat_pressure(self, p_throat_start=None):
@@ -234,7 +240,7 @@ class Ejector(ThreePortComponent):
             # Volume fractions inside throat
             phi_throat_vapor = ((state_throat.q/state_throat_vapor.d) /
                                 ((state_throat.q/state_throat_vapor.d) +
-                                 (state_throat.q/state_throat_liquid.d)))
+                                 ((1-state_throat.q)/state_throat_liquid.d)))
             phi_throat_liquid = 1 - phi_throat_vapor
             # Speed of sound for separate phases
             a_liquid = self.med_prop.get_saturated_speed_of_sound(self.p_throat, False)
