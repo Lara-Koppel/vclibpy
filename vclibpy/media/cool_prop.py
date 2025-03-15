@@ -137,6 +137,25 @@ class CoolProp(MedProp):
     def get_molar_mass(self):
         return self.M
 
+    def get_saturated_speed_of_sound(self, p, vapor: bool):
+        """
+        Calculate the speed of sound for saturated points based on pressure and quality.
+
+        Parameters:
+            p (float): Pressure in Pa
+            vapor (boolean): Boolean to calculate the speed of sound for either saturated vapour or liquid
+
+        Returns:
+            a (float): Speed of sound in m/s
+        """
+
+        if vapor:
+            q = 1
+        else:
+            q = 0
+        a = CoolPropInternal.PropsSI('A', 'P', p, 'Q', q, self.fluid_name)
+        return a
+
 
 if __name__ == '__main__':
     CoolProp("Propan")
