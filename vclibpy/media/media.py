@@ -202,7 +202,17 @@ class MedProp(abc.ABC):
             cv=0.5 * (tr_pr_in.cv + tr_pr_out.cv),
             state=None)
 
-    def get_saturated_speed_of_sound(self, p, vapor: bool):
+    def get_saturated_speed_of_sound(self, p, vapor: bool) -> float:
+        """
+        Calculate the speed of sound for saturated points based on pressure and quality.
+
+        Parameters:
+            p (float): Pressure in Pa
+            vapor (boolean): Boolean to calculate the speed of sound for either saturated vapour or liquid
+
+        Returns:
+            a (float): Speed of sound in m/s
+        """
         raise NotImplementedError
 
 
