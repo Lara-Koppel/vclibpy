@@ -7,9 +7,9 @@ import math
 
 import numpy
 
+import vclibpy.media.ref_prop
 from vclibpy.components.component import ThreePortComponent
-from vclibpy.media import ThermodynamicState
-
+from vclibpy.media import ThermodynamicState, MedProp
 
 logger = logging.getLogger(__name__)
 
@@ -79,7 +79,7 @@ class Ejector(ThreePortComponent):
         print(f"m_flow_primary = π * ({self.d_throat} * 10^-3)^2 / 4 * {self.state_throat.d} * {c_throat}")
         print(f"Calculated m_flow_primary: {self.m_flow_primary*3600}kg/h")
         print(self.state_throat)
-        return
+        #return
 
         # Now we can do calculations for the inlet of the mixing-chamber
         # 3: Calculate enthalpy of primary flow at inlet of mixing-chamber
@@ -213,6 +213,7 @@ class Ejector(ThreePortComponent):
 
         while True:
             num_iterations += 1
+            print(f"Iteration: {num_iterations}; Throat Pressure: {self.p_throat}")
             if isinstance(self.max_num_iterations, (int, float)):
                 if num_iterations > self.max_num_iterations:
                     logger.warning("Maximum number of iterations %s exceeded, while iterating p_throat. Stopping.",
@@ -251,11 +252,18 @@ class Ejector(ThreePortComponent):
             # Extensive heat capacities
             C_p_liquid = state_throat_liquid.d * phi_throat_liquid * c_p_liquid
             C_p_vapor = state_throat_vapor.d * phi_throat_vapor * c_p_vapor
-            # Thermal expansion coefficients
-            beta_liquid = self.med_prop.calc_transport_properties(state_throat_liquid).beta
-            beta_vapor = self.med_prop.calc_transport_properties(state_throat_vapor).beta
-            zeta_liquid = state_throat.T*beta_liquid/(state_throat_liquid.d*c_p_liquid)
-            zeta_vapor = state_throat.T*beta_vapor/(state_throat_vapor.d*c_p_vapor)
+            # To calculate Zeta we need a partial differential from medProp.
+            # CoolProp can calculate this directly,
+            # but with RefProp we have to transform it to values we can get using Maxwell's equations:
+            if isinstance(self.med_prop , vclibpy.media.cool_prop.CoolProp):
+                zeta_vapor = self.med_prop.get_partial_derivative("T", "P", "S", state_throat_vapor)
+                zeta_liquid = self.med_prop.get_partial_derivative("T", "P", "S", state_throat_liquid)
+            else:
+                # Thermal expansion coefficients
+                beta_liquid = self.med_prop.calc_transport_properties(state_throat_liquid).beta
+                beta_vapor = self.med_prop.calc_transport_properties(state_throat_vapor).beta
+                zeta_liquid = state_throat.T*beta_liquid/(state_throat_liquid.d*c_p_liquid)
+                zeta_vapor = state_throat.T*beta_vapor/(state_throat_vapor.d*c_p_vapor)
             x_1 = (phi_throat_vapor/(state_throat_vapor.d*a_vapor**2) +
                    phi_throat_liquid/(state_throat_liquid.d*a_liquid**2))
             x_2 = C_p_vapor*C_p_liquid*(zeta_liquid-zeta_vapor)**2 / (C_p_vapor+C_p_liquid)
