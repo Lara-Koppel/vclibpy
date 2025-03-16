@@ -211,10 +211,25 @@ class MedProp(abc.ABC):
             vapor (boolean): Boolean to calculate the speed of sound for either saturated vapour or liquid
 
         Returns:
-            a (float): Speed of sound in m/s
+            float: Speed of sound in m/s
         """
         raise NotImplementedError
 
+    def get_partial_derivative(self, numerator: str, denominator: str, constant: str, state: ThermodynamicState):
+        """
+        Return the chosen partial derivative at current Thermodynamic state
+
+        Args:
+            numerator (str): The state function in the numerator of the partial derivative.
+            denominator (str): The state function in the denominator of the partial derivative.
+            constant (str): The constant value state function of the partial derivative.
+            state (ThermodynamicState): Thermodynamic state to calculate the partial derivative at
+
+
+        Returns:
+            float: Value of the derivative
+        """
+        raise NotImplementedError
 
 def get_two_phase_limits(med_prop: MedProp, p_step: int = 1000, p_min: int = int(1e3)) -> List[ThermodynamicState]:
     """
