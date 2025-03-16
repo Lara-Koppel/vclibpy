@@ -1,13 +1,15 @@
 # # Example for standard ejector cycle
+from vclibpy.media import MedProp
+
+
 def main(use_condenser_inlet: bool = True):
     import numpy
     from vclibpy.components.expansion_valves.ejector import Ejector
-    from vclibpy.media import RefProp
+    from vclibpy.media import CoolProp, RefProp
     from vclibpy.utils.plotting import plot_cycle
     import matplotlib.pyplot as plt
     import CoolProp.CoolProp as CP
-    med_prop = RefProp(fluid_name="CarbonDioxide")
-
+    med_prop = CoolProp(fluid_name="CarbonDioxide")
     # p_throat = 4500000
     # q_list = numpy.linspace(0.0001, 0.9999, 100)
     # c = []
@@ -71,17 +73,13 @@ def main(use_condenser_inlet: bool = True):
     ejector = Ejector(0.8, 2)
     ejector.med_prop = med_prop
     ejector.state_secondary = med_prop.calc_state("PT", 3.60e6, 21.2+273.15)
-    for p in p_list:
-        print(f"Calculating state for pressure: {p} MPa")
-        ejector.state_primary = med_prop.calc_state("PT", p*1e6, 35.2+273.15)
-        ejector.calc_m_flow(4.30e6)
-    # ejector.state_primary = med_prop.calc_state("PT", 8.72e6, 35.2 + 273.15)
-    # print(ejector.calc_m_flow(4.30e6))
-
-    return
-
-
+    # for p in p_list:
+    #     print(f"Calculating state for pressure: {p} MPa")
+    #     ejector.state_primary = med_prop.calc_state("PT", p*1e6, 35.2+273.15)
+    #     ejector.calc_m_flow(4.30e6)
+    ejector.state_primary = med_prop.calc_state("PT", 8.72e6, 35.2 + 273.15)
     print(ejector.calc_m_flow(4.30e6))
+
     states = [ejector.state_primary,
               ejector.state_throat,
               ejector.state_primary_mixing,
@@ -89,9 +87,10 @@ def main(use_condenser_inlet: bool = True):
               ejector.state_outlet,
               ejector.state_mixing,
               ejector.state_secondary]
+    print(states)
     for state in states:
         print(state)
-    #plot_cycle(med_prop, states, show=True)
+    plot_cycle(med_prop, states, show=True)
 
 
 if __name__ == "__main__":
