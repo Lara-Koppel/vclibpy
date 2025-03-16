@@ -31,6 +31,15 @@ class CoolProp(MedProp):
         "PQ": (CoolPropInternal.PQ_INPUTS, True)
     }
 
+    _state_function_map = {
+        "P": CoolPropInternal.iP,  # Pressure
+        "T": CoolPropInternal.iT,  # Temperature
+        "D": CoolPropInternal.iDmass,  # Density (mass-based)
+        "H": CoolPropInternal.iHmass,  # Enthalpy (mass-based)
+        "S": CoolPropInternal.iSmass,  # Entropy (mass-based)
+        "U": CoolPropInternal.iUmass,  # Internal Energy (mass-based)
+    }
+
     def __init__(self, fluid_name, use_high_level_api: bool = False):
         super().__init__(fluid_name=fluid_name)
         # Set molar mass and trigger a possible fluid-name error
@@ -156,6 +165,20 @@ class CoolProp(MedProp):
         a = CoolPropInternal.PropsSI('A', 'P', p, 'Q', q, self.fluid_name)
         return a
 
+    def get_partial_derivative(self, numerator: str, denominator: str, constant: str, state: ThermodynamicState, ):
+        if {numerator, denominator, constant} - self._state_function_map.keys():
+            raise ValueError("Invalid property name! Use one of: " + ", ".join(self._state_function_map.keys()))
+
+        # When near the two phase region we have to use the PropsSI() function from the CoolProp High Level Interface
+        # Otherwise we can use the more computing friendly first_partial_deriv() function
+        if 0<=state.q<=1:
+            return CoolPropInternal.PropsSI(f'd({numerator})/d({denominator})|{constant}', 'P', state.p, 'Q', state.q, self.fluid_name)
+        else:
+            self._update_coolprop_heos("PT", state.p, state.T)
+            numerator_code = self._state_function_map[numerator]
+            denominator_code = self._state_function_map[denominator]
+            constant_code = self._state_function_map[constant]
+            return self._helmholtz_equation_of_state.first_partial_deriv(numerator_code, denominator_code, constant_code)
 
 if __name__ == '__main__':
     CoolProp("Propan")
