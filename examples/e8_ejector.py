@@ -9,18 +9,27 @@ def main(use_condenser_inlet: bool = True):
     from vclibpy.utils.plotting import plot_cycle
     import matplotlib.pyplot as plt
     import CoolProp.CoolProp as CP
+    import plotly.graph_objects as go
     med_prop = CoolProp(fluid_name="CarbonDioxide")
+
+
+    ###############################
+    # Sound speed calculation
+    ###############################
+
     # p_throat = 4500000
     # q_list = numpy.linspace(0.0001, 0.9999, 100)
     # c = []
     # c_2 = []
     # c_3 = []
+    # c_4 = []
     # phi = []
+    #
+    # state_throat_vapor = med_prop.calc_state("PQ", p_throat, 1)
+    # state_throat_liquid = med_prop.calc_state("PQ", p_throat, 0)
     # for q in q_list:
     #     state_throat = med_prop.calc_state("PQ", p_throat, q)
     #
-    #     state_throat_vapor = med_prop.calc_state("PQ", p_throat, 1)
-    #     state_throat_liquid = med_prop.calc_state("PQ", p_throat, 0)
     #     # Volume fractions inside throat
     #     phi_throat_vapor = ((state_throat.q / state_throat_vapor.d) /
     #                         ((state_throat.q / state_throat_vapor.d) +
@@ -54,31 +63,73 @@ def main(use_condenser_inlet: bool = True):
     #     dT_dp_s_value_l = CP.PropsSI('d(T)/d(P)|S', 'P', p_throat, 'Q', 0, "CarbonDioxide")
     #     dT_dp_s_value_g = CP.PropsSI('d(T)/d(P)|S', 'P', p_throat, 'Q', 1, "CarbonDioxide")
     #     c_throat_3 = (state_throat.d * x_1 + (state_throat.d / state_throat.T) * C_p_vapor*C_p_liquid*(dT_dp_s_value_l-dT_dp_s_value_g)**2/(C_p_vapor+C_p_liquid)) ** -0.5
+    #     print(
+    #         f"q={q}: c_throat_3 = ({state_throat.d} * {x_1} + ({state_throat.d} / {state_throat.T}) * {C_p_vapor} * {C_p_liquid} * ({dT_dp_s_value_l} - {dT_dp_s_value_g}) ** 2 / ({C_p_vapor} + {C_p_liquid})) ** -0.5")
     #     c_3.append(c_throat_3)
+    #     c_4.append(state_throat.q/state_throat.T*x_2)
     #
     # print(med_prop.get_saturated_speed_of_sound(p_throat, False))
     # print(med_prop.get_saturated_speed_of_sound(p_throat, True))
+    # print(med_prop.calc_transport_properties(state_throat_liquid).cp)
+    # print(med_prop.calc_transport_properties(state_throat_vapor).cp)
+    # print(state_throat_liquid.d)
+    # print(state_throat_vapor.d)
     #
-    # plt.figure()
+    # plt.figure(figsize=(10, 8))
+    #
+    # # First subplot
+    # plt.subplot(2, 1, 1)
     # plt.plot(phi, c, label="long")
     # plt.plot(phi, c_2, label="short")
     # plt.plot(phi, c_3, label="CoolProp")
     # plt.legend()
     # plt.xlabel('Quality')
     # plt.ylabel('Speed of sound')
+    # plt.title('Speed of sound comparison')
+    #
+    # # Second subplot
+    # plt.subplot(2, 1, 2)
+    # plt.plot(phi, c_4, label="difference")
+    # plt.legend()
+    # plt.xlabel('Quality')
+    # plt.ylabel('Speed of sound difference')
+    # plt.title('Speed of sound difference')
+    #
+    # plt.tight_layout()
     # plt.show()
 
-    #
-    p_list = [8.1, 8.15, 8.39, 8.43, 8.44, 8.66, 8.71, 8.72, 9.04, 9.05, 9.19, 9.22, 9.26, 9.3, 9.33, 9.34, 9.45, 9.57, 9.67, 9.71]
-    ejector = Ejector(0.8, 2)
+    ###############################
+    # Ejector calculation
+    ###############################
+    ejector = Ejector(0.8, 2, use_quick_solver=True)
     ejector.med_prop = med_prop
-    ejector.state_secondary = med_prop.calc_state("PT", 3.60e6, 21.2+273.15)
+    ejector.state_secondary = med_prop.calc_state("PT", 3.62e6, 21.6+273.15)
+
+
+    # p_list = [8.1, 8.15, 8.39, 8.43, 8.44, 8.66, 8.71, 8.72, 9.04, 9.05, 9.19, 9.22, 9.26, 9.3, 9.33, 9.34, 9.45, 9.57, 9.67, 9.71]
+    # p_list_2 = numpy.arange(8.0, 10, 0.1)
+    # m_flow_list = []
+    # q_list = []
+    # pt_list = []
     # for p in p_list:
     #     print(f"Calculating state for pressure: {p} MPa")
     #     ejector.state_primary = med_prop.calc_state("PT", p*1e6, 35.2+273.15)
-    #     ejector.calc_m_flow(4.30e6)
-    ejector.state_primary = med_prop.calc_state("PT", 8.72e6, 35.2 + 273.15)
-    print(ejector.calc_m_flow(4.30e6))
+    #     ejector.calc_m_flow(4.30e6, correlation=True)
+    #     m_flow_list.append(ejector.m_flow_primary*3600)
+    #     q_list.append(ejector.state_throat.q)
+    #     pt_list.append(ejector.state_throat.p)
+
+    # plt.subplot(3, 1, 1)
+    # plt.plot(p_list, m_flow_list)
+    # plt.subplot(3, 1, 2)
+    # plt.plot(p_list, q_list)
+    # plt.subplot(3, 1, 3)
+    # plt.plot(p_list, pt_list)
+    #
+    # plt.show()
+
+    ejector.state_primary = med_prop.calc_state("PT", 8.15e6, 35.2 + 273.15)
+    print(ejector.calc_m_flow(p_3=4210000, correlation=True)*3600)
 
     states = [ejector.state_primary,
               ejector.state_throat,
@@ -92,9 +143,94 @@ def main(use_condenser_inlet: bool = True):
         print(state)
     plot_cycle(med_prop, states, show=True)
 
+    ###############################
+    # Error calculation p_throat
+    ###############################
+    # Define the range of throat pressures and primary pressures
+    # p_throat = numpy.arange(3000000, 8000000, 10000)
+    # p_primary = numpy.arange(7000000, 11000000, 10000)
+    #
+    # # Initialize the error list to store errors for each combination of throat and primary pressures
+    # error_list = [[0] * len(p_throat) for _ in range(len(p_primary))]
+    # print(error_list.__len__())
+    # print(error_list[29].__len__())
+    #
+    # # Create an Ejector object and set its properties
+    # ejector = Ejector(0.8, 2, use_quick_solver=True)
+    # ejector.med_prop = med_prop
+    #
+    # # Iterate over each primary pressure
+    # i, j = 0, 0
+    # for p_p in p_primary:
+    #     # Set the primary state for the ejector
+    #     ejector.state_primary = med_prop.calc_state("PT", p_p, 35.2 + 273.15)
+    #
+    #     # Iterate over each throat pressure
+    #     for p_t in p_throat:
+    #         # Calculate the error for the current throat pressure and store it in the error list
+    #         error_list[i][j] = ejector.iterate_throat_pressure(p_t)
+    #         j += 1
+    #     i += 1
+    #     j = 0
+    #     print(f"Progress: {i}/{len(p_primary)}")
+    #
+    # # Convert the error list to a numpy array for plotting
+    # data = numpy.array(error_list).T
+    #
+    # # Create a meshgrid for plotting
+    # x = p_primary
+    # y = p_throat
+    # x, y = numpy.meshgrid(x, y)
+    #
+    # # Plot the error surface
+    # fig = plt.figure()
+    # ax = fig.add_subplot(111, projection='3d')
+    # ax.plot_surface(x, y, data, cmap='viridis')
+    #
+    # # Mark positions where z is about 0
+    # z_threshold = 0.01  # Define a threshold for z values close to 0
+    # mask = numpy.abs(data) < z_threshold
+    # ax.scatter(x[mask], y[mask], data[mask], color='red', s=10, label='z ≈ 0', zorder=10)
+    #
+    # ax.set_xlabel('Primary pressure')
+    # ax.set_ylabel('Throat pressure')
+    # ax.set_zlabel('Error')
+    # plt.show()
+    #
+    # # Create a 3D surface plot
+    # fig = go.Figure(data=[go.Surface(z=data, x=x, y=y)])
+    #
+    # # Add labels
+    # fig.update_layout(scene=dict(
+    #     xaxis_title='Primary pressure',
+    #     yaxis_title='Throat pressure',
+    #     zaxis_title='Error'
+    # ))
+    #
+    # # Mark positions where z is about 0
+    # z_threshold = 0.01  # Define a threshold for z values close to 0
+    # mask = numpy.abs(data) < z_threshold
+    # fig.add_trace(go.Scatter3d(
+    #     x=x[mask],
+    #     y=y[mask],
+    #     z=data[mask],
+    #     mode='markers',
+    #     marker=dict(color='green', size=5),
+    #     name='z ≈ 0'
+    # ))
+    #
+    # # Save the plot as an HTML file
+    # fig.write_html('J:/error_surface.html')
+    #
+    # # To view the plot, open the HTML file in a web browser
+
 
 if __name__ == "__main__":
     main(use_condenser_inlet=False)
+
+############################################
+# partial derivative calculation
+############################################
 
 # import CoolProp.CoolProp as CP
 #
