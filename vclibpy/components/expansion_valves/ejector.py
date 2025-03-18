@@ -46,11 +46,11 @@ class Ejector(ThreePortComponent):
                  **kwargs):
         """Initialize class with kwargs"""
         self.max_err = kwargs.pop("max_err", 0.5)
-        self.min_iteration_step = kwargs.pop("min_iteration_step", 10)
+        self.min_iteration_step = kwargs.pop("min_iteration_step", 1)
         self.show_iteration = kwargs.get("show_iteration", False)
         self.use_quick_solver = kwargs.pop("use_quick_solver", True)
         self.max_num_iterations = kwargs.pop("max_num_iterations", int(1e5))
-        self.step_max = kwargs.pop("step_max", 100)
+        self.step_max = kwargs.pop("step_max", 100000)
         super().__init__()
         self.d_throat = d_throat
         self.d_mixing = d_mixing
@@ -140,7 +140,7 @@ class Ejector(ThreePortComponent):
                                 100 * (num_iterations + 1) / self.max_num_iterations, self.max_num_iterations)
 
             self.m_flow_secondary = A_secondary_mixing*self.state_secondary.d*v_secondary_mixing
-            phi_m = self.c_m - 0.34*math.exp(-0.3125*self.m_flow_secondary/self.m_flow_primary)
+            phi_m = self.c_m - 0.34*math.exp(-3.125*self.m_flow_secondary/self.m_flow_primary)
             v_mixing = (phi_m*(self.m_flow_primary*v_primary_mixing + self.m_flow_secondary*v_secondary_mixing)/
                         (self.m_flow_primary+self.m_flow_secondary))
             h_mixing = ((self.m_flow_primary*(self.state_primary_mixing.h+0.5*v_primary_mixing**2) +
@@ -276,7 +276,7 @@ class Ejector(ThreePortComponent):
             # Speed of sound for two phase flow
             c_throat = (state_throat.d*x_1 + (state_throat.d/state_throat.T)*x_2)**-0.5  #
             # 1c: Calculate specific enthalpy using energy balance - assume Ma_throat = 1
-            Q_NE = 8629*math.e**(-10*state_throat.q)  # Correlation for non-equilibrium phase change
+            Q_NE = 2500*math.e**(-10*(state_throat.q))  # Correlation for non-equilibrium phase change
             #print(f"liquid mass fraction: {1-state_throat.q}, Q_NE = {Q_NE}")
             h_throat_2 = self.state_primary.h - c_throat**2/2 + Q_NE
 
@@ -327,4 +327,5 @@ class Ejector(ThreePortComponent):
             else:
                 # The error and step_p_throat are smaller than max_error and min_iteration_step. We can break.
                 print(f"Converged after {num_iterations} iterations")
+                print(state_throat.q, Q_NE)
                 return state_throat, c_throat

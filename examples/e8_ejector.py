@@ -1,17 +1,17 @@
 # # Example for standard ejector cycle
 from vclibpy.media import MedProp
+import numpy
+from vclibpy.components.expansion_valves.ejector import Ejector
+from vclibpy.media import CoolProp, RefProp
+from vclibpy.utils.plotting import plot_cycle
+import matplotlib.pyplot as plt
+import CoolProp.CoolProp as CP
+import plotly.graph_objects as go
+import math
 
+med_prop = CoolProp(fluid_name="CarbonDioxide")
 
 def main(use_condenser_inlet: bool = True):
-    import numpy
-    from vclibpy.components.expansion_valves.ejector import Ejector
-    from vclibpy.media import CoolProp, RefProp
-    from vclibpy.utils.plotting import plot_cycle
-    import matplotlib.pyplot as plt
-    import CoolProp.CoolProp as CP
-    import plotly.graph_objects as go
-    med_prop = CoolProp(fluid_name="CarbonDioxide")
-
 
     ###############################
     # Sound speed calculation
@@ -106,42 +106,55 @@ def main(use_condenser_inlet: bool = True):
     ejector.state_secondary = med_prop.calc_state("PT", 3.62e6, 21.6+273.15)
 
 
-    # p_list = [8.1, 8.15, 8.39, 8.43, 8.44, 8.66, 8.71, 8.72, 9.04, 9.05, 9.19, 9.22, 9.26, 9.3, 9.33, 9.34, 9.45, 9.57, 9.67, 9.71]
-    # p_list_2 = numpy.arange(8.0, 10, 0.1)
-    # m_flow_list = []
-    # q_list = []
-    # pt_list = []
-    # for p in p_list:
-    #     print(f"Calculating state for pressure: {p} MPa")
-    #     ejector.state_primary = med_prop.calc_state("PT", p*1e6, 35.2+273.15)
-    #     ejector.calc_m_flow(4.30e6, correlation=True)
-    #     m_flow_list.append(ejector.m_flow_primary*3600)
-    #     q_list.append(ejector.state_throat.q)
-    #     pt_list.append(ejector.state_throat.p)
+    pp_list = [8.1, 8.15, 8.39, 8.43, 8.44, 8.66, 8.71, 8.72, 9.04, 9.05, 9.19, 9.22, 9.26, 9.3, 9.33, 9.34, 9.45, 9.57, 9.67, 9.71]
+    Tp_list = [35, 35.3, 35.5, 35.2, 35, 35.1, 35.3, 35.6, 35.4, 35.7, 35.2, 35.3, 35.5, 35.5, 35.5, 35, 35.2, 35.4, 35.1, 35.4]
+    ps_list = [3.62, 3.63, 3.59, 3.6, 3.62, 3.6, 3.63, 3.61, 3.59, 3.62, 3.6, 3.62, 3.6, 3.6, 3.62, 3.63, 3.59, 3.6, 3.62, 3.61]
+    Ts_list = [22.4, 25, 22.4, 22.8, 22, 22.2, 20.7, 20.5, 21.7, 22.4, 22.8, 22.4, 22.8, 21.9, 21.6, 22.1, 21.3, 21.2, 21.8, 20.6]
+    pb_list = [4.2, 4.3, 4.25, 4.05, 4.19, 4, 4.3, 4.19, 3.98, 4.22, 4.27, 4.2, 4.27, 4.03, 4.21, 4.29, 3.94, 4.3, 4.21, 3.99]
+    Tb_list = [7.7, 8.8, 8.4, 6.5, 7.7, 5.9, 8.7, 7.6, 5.8, 8, 8.5, 7.8, 8.5, 6.4, 7.8, 8.5, 5.3, 8.7, 7.8, 5.9]
+    p_list_2 = numpy.arange(8.0, 10, 0.1)
+    m_flow_list = []
+    q_list = []
+    pt_list = []
+    for i in range(len(pp_list)):
+        print(f"Calculating state for pressure: {pp_list[i]} MPa")
+        ejector.state_primary = med_prop.calc_state("PT", pp_list[i]*1e6, Tp_list[i]+273.15)
+        ejector.state_secondary = med_prop.calc_state("PT", ps_list[i]*1e6, Ts_list[i]+273.15)
+        ejector.calc_m_flow(pb_list[i]*1e6, correlation=False)
+        m_flow_list.append(ejector.m_flow_primary*3600)
+        q_list.append(ejector.state_throat.q)
+        pt_list.append(ejector.state_throat.p)
 
-    # plt.subplot(3, 1, 1)
-    # plt.plot(p_list, m_flow_list)
-    # plt.subplot(3, 1, 2)
-    # plt.plot(p_list, q_list)
-    # plt.subplot(3, 1, 3)
-    # plt.plot(p_list, pt_list)
-    #
+    plt.subplot(3, 1, 1)
+    plt.plot(pp_list, m_flow_list)
+    plt.subplot(3, 1, 2)
+    plt.plot(pp_list, q_list)
+    plt.subplot(3, 1, 3)
+    plt.plot(pp_list, pt_list)
+    plt.show()
+
+    ###############################
+    # Q_NE Plot
+    ###############################
+    # x = numpy.arange(0.2, 0.8, 0.01)
+    # Q_NE = 8629 * math.e ** (-10 * (1 - x))
+    # plt.plot(x, Q_NE)
     # plt.show()
 
-    ejector.state_primary = med_prop.calc_state("PT", 8.15e6, 35.2 + 273.15)
-    print(ejector.calc_m_flow(p_3=4210000, correlation=True)*3600)
-
-    states = [ejector.state_primary,
-              ejector.state_throat,
-              ejector.state_primary_mixing,
-              ejector.state_mixing,
-              ejector.state_outlet,
-              ejector.state_mixing,
-              ejector.state_secondary]
-    print(states)
-    for state in states:
-        print(state)
-    plot_cycle(med_prop, states, show=True)
+    # ejector.state_primary = med_prop.calc_state("PT", 8.15e6, 35.2 + 273.15)
+    # print(ejector.calc_m_flow(p_3=4210000, correlation=True)*3600)
+    #
+    # states = [ejector.state_primary,
+    #           ejector.state_throat,
+    #           ejector.state_primary_mixing,
+    #           ejector.state_mixing,
+    #           ejector.state_outlet,
+    #           ejector.state_mixing,
+    #           ejector.state_secondary]
+    # print(states)
+    # for state in states:
+    #     print(state)
+    # plot_cycle(med_prop, states, show=True)
 
     ###############################
     # Error calculation p_throat
