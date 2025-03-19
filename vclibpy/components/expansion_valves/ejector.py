@@ -50,7 +50,7 @@ class Ejector(ThreePortComponent):
         self.show_iteration = kwargs.get("show_iteration", False)
         self.use_quick_solver = kwargs.pop("use_quick_solver", True)
         self.max_num_iterations = kwargs.pop("max_num_iterations", int(1e5))
-        self.step_max = kwargs.pop("step_max", 100000)
+        self.step_max = kwargs.pop("step_max", 10000)
         super().__init__()
         self.d_throat = d_throat
         self.d_mixing = d_mixing
@@ -78,7 +78,7 @@ class Ejector(ThreePortComponent):
         # 2: Now that we know p_throat, we can continue with calculating the mass flow through the primary nozzle
         self.m_flow_primary = math.pi*(self.d_throat*10**-3)**2/4*self.state_throat.d*c_throat
         #print(f"m_flow_primary = π * ({self.d_throat} * 10^-3)^2 / 4 * {self.state_throat.d} * {c_throat}")
-        print(f"Calculated m_flow_primary: {self.m_flow_primary*3600}kg/h")
+        #print(f"Calculated m_flow_primary: {self.m_flow_primary*3600}kg/h")
         #print(self.state_throat)
 
         # Now we can do calculations for the inlet of the mixing-chamber
@@ -91,14 +91,14 @@ class Ejector(ThreePortComponent):
         v_primary_mixing = math.sqrt(c_throat**2 + 2*(self.state_throat.h-self.state_primary_mixing.h +
                                                       self.state_throat.p/self.state_throat.d -
                                                       self.state_primary_mixing.p/self.state_primary_mixing.d))
-        print(f"v_primary_mixing = {v_primary_mixing}")
+        #print(f"v_primary_mixing = {v_primary_mixing}")
         # 5: Calculate flow area occupied by primary nozzle flow at mixing-chamber inlet
         A_primary_mixing = self.m_flow_primary/(self.state_primary_mixing.d*v_primary_mixing)
-        print(f"A_mixing = {(self.d_mixing*0.001)**2/4*math.pi}")
-        print(f"A_primary_mixing = {A_primary_mixing}")
+        #print(f"A_mixing = {(self.d_mixing*0.001)**2/4*math.pi}")
+        #print(f"A_primary_mixing = {A_primary_mixing}")
         # 6: Calculate flow area occupied by secondary nozzle flow at mixing chamber inlet
         A_secondary_mixing = math.pi/4*(self.d_mixing*0.001)**2 - A_primary_mixing
-        print(f"A_secondary_mixing = {A_secondary_mixing}")
+        #print(f"A_secondary_mixing = {A_secondary_mixing}")
         # Now we can calculate the mixing process and the flow in the diffuser
         # For this we have a nonlinear equation system we need to solve numerically
         # 7: Calculate secondary mass flow, thermodynamic state in mixing chamber and at outlet
@@ -278,7 +278,7 @@ class Ejector(ThreePortComponent):
             # 1c: Calculate specific enthalpy using energy balance - assume Ma_throat = 1
             Q_NE = 2500*math.e**(-10*(state_throat.q))  # Correlation for non-equilibrium phase change
             #print(f"liquid mass fraction: {1-state_throat.q}, Q_NE = {Q_NE}")
-            h_throat_2 = self.state_primary.h - c_throat**2/2 + Q_NE
+            h_throat_2 = self.state_primary.h - c_throat**2/2 #+ Q_NE
 
             # Calculate error between two calculations for h_throat
             error_h_throat = (h_throat_2/h_throat-1)*100
@@ -326,6 +326,7 @@ class Ejector(ThreePortComponent):
                         continue
             else:
                 # The error and step_p_throat are smaller than max_error and min_iteration_step. We can break.
-                print(f"Converged after {num_iterations} iterations")
-                print(state_throat.q, Q_NE)
+                v_throat_2 = math.sqrt(2 * (self.state_primary.h - h_throat + Q_NE))
+                #print(f"Converged after {num_iterations} iterations")
+                #print(state_throat.q, Q_NE)
                 return state_throat, c_throat
