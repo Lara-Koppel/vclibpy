@@ -8,6 +8,8 @@ import matplotlib.pyplot as plt
 import CoolProp.CoolProp as CP
 import plotly.graph_objects as go
 import math
+import pandas as pd
+import openpyxl
 
 med_prop = RefProp(fluid_name="CarbonDioxide")
 ejector = Ejector(0.8, 2, use_quick_solver=True)
@@ -15,13 +17,13 @@ ejector.med_prop = med_prop
 
 
 def main(use_condenser_inlet: bool = True):
-    ejector_calculation()
+    m_flow_calculation('J:/Daten_Ejektor_1.xlsx')
 
 
 def calc_single_ejector_state():
     ejector.state_primary = med_prop.calc_state("PT", 8.15e6, 35.2 + 273.15)
     ejector.state_secondary = med_prop.calc_state("PT", 3.62e6, 21.6 + 273.15)
-    print(ejector.calc_m_flow(p_3=4210000, correlation=True) * 3600)
+    print(ejector.calc_m_flow(p_3=4210000, correlation=False) * 3600)
 
     states = [ejector.state_primary,
               ejector.state_throat,
@@ -36,18 +38,19 @@ def calc_single_ejector_state():
     plot_cycle(med_prop, states, show=True)
 
 
-def ejector_calculation():
-    pp_list = [8.1, 8.15, 8.39, 8.43, 8.44, 8.66, 8.71, 8.72, 9.04, 9.05, 9.19, 9.22, 9.26, 9.3, 9.33, 9.34, 9.45, 9.57,
-               9.67, 9.71]
-    Tp_list = [35, 35.3, 35.5, 35.2, 35, 35.1, 35.3, 35.6, 35.4, 35.7, 35.2, 35.3, 35.5, 35.5, 35.5, 35, 35.2, 35.4,
-               35.1, 35.4]
-    ps_list = [3.62, 3.63, 3.59, 3.6, 3.62, 3.6, 3.63, 3.61, 3.59, 3.62, 3.6, 3.62, 3.6, 3.6, 3.62, 3.63, 3.59, 3.6,
-               3.62, 3.61]
-    Ts_list = [22.4, 25, 22.4, 22.8, 22, 22.2, 20.7, 20.5, 21.7, 22.4, 22.8, 22.4, 22.8, 21.9, 21.6, 22.1, 21.3, 21.2,
-               21.8, 20.6]
-    pb_list = [4.2, 4.3, 4.25, 4.05, 4.19, 4, 4.3, 4.19, 3.98, 4.22, 4.27, 4.2, 4.27, 4.03, 4.21, 4.29, 3.94, 4.3, 4.21,
-               3.99]
-    Tb_list = [7.7, 8.8, 8.4, 6.5, 7.7, 5.9, 8.7, 7.6, 5.8, 8, 8.5, 7.8, 8.5, 6.4, 7.8, 8.5, 5.3, 8.7, 7.8, 5.9]
+def m_flow_calculation(excel_path: str):
+    # Read the Excel file
+    df = pd.read_excel(excel_path)
+
+    # Drop rows with NaN values
+    df = df.dropna(subset=['P_p', 'T_p', 'P_s', 'T_s', 'P_b', 'T_b'])
+
+    pp_list = df['P_p'].tolist()
+    Tp_list = df['T_p'].tolist()
+    ps_list = df['P_s'].tolist()
+    Ts_list = df['T_s'].tolist()
+    pb_list = df['P_b'].tolist()
+    Tb_list = df['T_b'].tolist()
     m_flow_list = [[0]*2 for i in range(len(pp_list))]
 
     for i in range(len(pp_list)):
@@ -57,6 +60,15 @@ def ejector_calculation():
         ejector.calc_m_flow(pb_list[i] * 1e6, correlation=False)
         m_flow_list[i][0] = ejector.m_flow_primary * 3600
         m_flow_list[i][1] = ejector.m_flow_secondary * 3600
+
+    # Add the m_flow_list values to a new column in the DataFrame
+    df['m_p_iterated_QNE_2500'] = [m[0] for m in m_flow_list]
+    df['m_s_iterated_QNE_2500'] = [m[1] for m in m_flow_list]
+
+    with pd.ExcelWriter(excel_path, mode='a', if_sheet_exists='overlay') as writer:
+        df.to_excel(writer, index=False, sheet_name='Tabelle1', startcol=)
+        df.
+
     plt.figure(figsize=(10, 6))
     plt.plot(pp_list, [m[0] for m in m_flow_list], label='Primary Mass Flow')
     plt.plot(pp_list, [m[1] for m in m_flow_list], label='Secondary Mass Flow')
@@ -186,7 +198,7 @@ def error_calculation_p_throat():
 
     # Define the range of throat pressures and primary pressures
     p_throat = numpy.arange(3000000, 8000000, 10000)
-    p_primary = numpy.arange(7000000, 11000000, 10000)
+    p_primary = numpy.arange(6000000, 11000000, 10000)
 
     # Initialize the error list to store errors for each combination of throat and primary pressures
     error_list = [[0] * len(p_throat) for _ in range(len(p_primary))]

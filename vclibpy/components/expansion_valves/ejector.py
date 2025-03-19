@@ -194,7 +194,7 @@ class Ejector(ThreePortComponent):
             else:
                 # The error and step_v_sm are smaller than max_error and v_step_min. We can break.
                 self.state_outlet = self.med_prop.calc_state("PH", p_3, h_outlet)
-                print(f"v_secondary_mixing = {v_secondary_mixing}; converged after {num_iterations} iterations")
+                #print(f"v_secondary_mixing = {v_secondary_mixing}; converged after {num_iterations} iterations")
                 return
 
     def iterate_throat_pressure(self, p_throat_start=None, correlation=False):
@@ -287,7 +287,7 @@ class Ejector(ThreePortComponent):
             #print(error_h_throat)
             if use_correlation:
                 v_throat_2 = math.sqrt(2 * (self.state_primary.h - h_throat + Q_NE))
-                print(c_throat, v_throat_2, v_throat_2/c_throat-1)
+                #print(c_throat, v_throat_2, v_throat_2/c_throat-1)
                 return state_throat, v_throat_2
             if abs(error_h_throat) > self.max_err or step_p_throat > self.min_iteration_step:
                 # In the first two iteration steps we need to find out in which direction to adjust p_throat
