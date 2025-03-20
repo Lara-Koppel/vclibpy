@@ -11,13 +11,18 @@ import math
 import pandas as pd
 import openpyxl
 
+plt.style.use('D:/kbr-fme/ebc.paper.mplstyle')
+
+
 med_prop = RefProp(fluid_name="CarbonDioxide")
-ejector = Ejector(0.8, 2, use_quick_solver=True)
+ejector = Ejector(1, 2.6, use_quick_solver=True)
 ejector.med_prop = med_prop
 
 
 def main(use_condenser_inlet: bool = True):
-    m_flow_calculation('J:/Daten_Ejektor_1.xlsx')
+    #m_flow_calculation('J:/Massenstromberechnungen/Daten_Ejektor_2.xlsx')
+    #error_calculation_p_throat()
+    p_throat_iteration()
 
 
 def calc_single_ejector_state():
@@ -62,21 +67,20 @@ def m_flow_calculation(excel_path: str):
         m_flow_list[i][1] = ejector.m_flow_secondary * 3600
 
     # Add the m_flow_list values to a new column in the DataFrame
-    df['m_p_iterated_QNE_2500'] = [m[0] for m in m_flow_list]
-    df['m_s_iterated_QNE_2500'] = [m[1] for m in m_flow_list]
+    df['m_p_iteration_QNE_2500'] = [m[0] for m in m_flow_list]
+    df['m_s_iteration_QNE_2500'] = [m[1] for m in m_flow_list]
 
     with pd.ExcelWriter(excel_path, mode='a', if_sheet_exists='overlay') as writer:
-        df.to_excel(writer, index=False, sheet_name='Tabelle1', startcol=)
-        df.
+        df.to_excel(writer, index=False, sheet_name='Tabelle1')
 
-    plt.figure(figsize=(10, 6))
-    plt.plot(pp_list, [m[0] for m in m_flow_list], label='Primary Mass Flow')
-    plt.plot(pp_list, [m[1] for m in m_flow_list], label='Secondary Mass Flow')
-    plt.xlabel('Primary Pressure [MPa]')
-    plt.ylabel('Mass Flow [kg/h]')
-    plt.title('Primary and Secondary Mass Flow vs Primary Pressure')
-    plt.legend()
-    plt.show()
+    # plt.figure(figsize=(10, 6))
+    # plt.plot(pp_list, [m[0] for m in m_flow_list], label='Primary Mass Flow')
+    # plt.plot(pp_list, [m[1] for m in m_flow_list], label='Secondary Mass Flow')
+    # plt.xlabel('Primary Pressure [MPa]')
+    # plt.ylabel('Mass Flow [kg/h]')
+    # plt.title('Primary and Secondary Mass Flow vs Primary Pressure')
+    # plt.legend()
+    # plt.show()
 
 
 def qne_plot():
@@ -197,8 +201,8 @@ def error_calculation_p_throat():
     """When running: change in ejector.py: 1. check nozzle quality to return -1; 2. return error h_throat after calculation"""
 
     # Define the range of throat pressures and primary pressures
-    p_throat = numpy.arange(3000000, 8000000, 10000)
-    p_primary = numpy.arange(6000000, 11000000, 10000)
+    p_throat = numpy.arange(1000000, 8000000, 10000)
+    p_primary = numpy.arange(3000000, 12000000, 10000)
 
     # Initialize the error list to store errors for each combination of throat and primary pressures
     error_list = [[0] * len(p_throat) for _ in range(len(p_primary))]
