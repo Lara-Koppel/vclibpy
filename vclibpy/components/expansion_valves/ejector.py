@@ -138,6 +138,10 @@ class Ejector(ThreePortComponent):
                 if (num_iterations + 1) % (0.1 * self.max_num_iterations) == 0:
                     logger.info("Info: %s percent of max_num_iterations %s for iterating v_sm used",
                                 100 * (num_iterations + 1) / self.max_num_iterations, self.max_num_iterations)
+            # Check if v_secondary_mixing is negative, if so, stop and raise error
+            if v_secondary_mixing < 0:
+                logger.error("v_secondary_mixing is negative. Stopping.") #  ToDO: Check what happens if v_secondary_mixing is close to zero
+                return
 
             self.m_flow_secondary = A_secondary_mixing*self.state_secondary.d*v_secondary_mixing
             phi_m = self.c_m - 0.34*math.exp(-3.125*self.m_flow_secondary/self.m_flow_primary)
