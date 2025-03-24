@@ -51,7 +51,8 @@ class StandardEjectorCycle(BaseEjectorCycle, ABC):
         # Ejector
         self.ejector.state_primary = self.condenser.state_outlet
         # in the standard cycle the secondary inlet is the vapour from the evaporator outlet
-        self.ejector.state_secondary = self.med_prop.calc_state("PQ", p_1, 1)
+        self.set_evaporator_outlet_based_on_superheating(p_eva=p_1, inputs=inputs)
+        self.ejector.state_secondary = self.evaporator.state_outlet
 
         p_3 = self.iterate_p3(p_1, p_2, inputs, fs_state)
 
