@@ -26,3 +26,10 @@ class BaseEjectorCycle(BaseCycle, abc.ABC):
         self.ejector = ejector
         self.compressor = compressor
         self.metering_valve = metering_valve
+
+    def get_all_components(self):
+        return super().get_all_components() + [
+            self.ejector,
+            self.compressor,
+            self.metering_valve
+        ]
