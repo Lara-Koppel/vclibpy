@@ -1,9 +1,13 @@
 # # Example for standard ejector cycle
+import logging
+
+import vclibpy.components.heat_exchangers
 from vclibpy.media import MedProp
 import numpy
 from vclibpy.components.expansion_valves.ejector import Ejector
 from vclibpy.media import CoolProp, RefProp
 from vclibpy.utils.plotting import plot_cycle
+from vclibpy.flowsheets.standard_ejector_cycle import StandardEjectorCycle
 import matplotlib.pyplot as plt
 import CoolProp.CoolProp as CP
 import plotly.graph_objects as go
@@ -11,10 +15,13 @@ import math
 import pandas as pd
 import openpyxl
 
-plt.style.use('D:/kbr-fme/ebc.paper.mplstyle')
+try:
+    plt.style.use('D:/kbr-fme/ebc.paper.mplstyle')
+except OSError:
+    logging.warning("Could not load the custom matplotlib style file. Using default style.")
 
 
-med_prop = RefProp(fluid_name="CarbonDioxide")
+med_prop = CoolProp(fluid_name="CarbonDioxide")
 ejector = Ejector(1, 2.6, use_quick_solver=True)
 ejector.med_prop = med_prop
 
@@ -22,13 +29,57 @@ ejector.med_prop = med_prop
 def main(use_condenser_inlet: bool = True):
     #m_flow_calculation('J:/Massenstromberechnungen/Daten_Ejektor_2.xlsx')
     #error_calculation_p_throat()
-    p_throat_iteration()
+    #p_throat_iteration()
+    calc_single_ejector_state()
+
+
+def test_standard_ejector_cycle():
+    from vclibpy.components.heat_exchangers import moving_boundary_ntu
+    from vclibpy.components.heat_exchangers import heat_transfer
+    condenser = moving_boundary_ntu.MovingBoundaryNTUCondenser(
+        A=5,
+        secondary_medium="water",
+        flow_type="counter",
+        ratio_outer_to_inner_area=1,
+        two_phase_heat_transfer=heat_transfer.constant.ConstantTwoPhaseHeatTransfer(alpha=5000),
+        gas_heat_transfer=heat_transfer.constant.ConstantHeatTransfer(alpha=5000),
+        wall_heat_transfer=heat_transfer.wall.WallTransfer(lambda_=236, thickness=2e-3),
+        liquid_heat_transfer=heat_transfer.constant.ConstantHeatTransfer(alpha=5000),
+        secondary_heat_transfer=heat_transfer.constant.ConstantHeatTransfer(alpha=5000)
+    )
+    evaporator = moving_boundary_ntu.MovingBoundaryNTUEvaporator(
+        A=15,
+        secondary_medium="air",
+        flow_type="counter",
+        ratio_outer_to_inner_area=10,
+        two_phase_heat_transfer=heat_transfer.constant.ConstantTwoPhaseHeatTransfer(alpha=1000),
+        gas_heat_transfer=heat_transfer.constant.ConstantHeatTransfer(alpha=1000),
+        wall_heat_transfer=heat_transfer.wall.WallTransfer(lambda_=236, thickness=2e-3),
+        liquid_heat_transfer=heat_transfer.constant.ConstantHeatTransfer(alpha=5000),
+        secondary_heat_transfer=heat_transfer.constant.ConstantHeatTransfer(alpha=25)
+    )
+    from vclibpy.components.expansion_valves import Bernoulli
+    expansion_valve = Bernoulli(A=0.01)
+    from vclibpy.components.compressors import RotaryCompressor
+    compressor = RotaryCompressor(
+        N_max=125,
+        V_h=19e-6
+    )
+
+    flowsheet = StandardEjectorCycle(
+        evaporator=evaporator,
+        condenser=condenser,
+        fluid="Propane",
+        compressor=compressor,
+        expansion_valve=ejector,
+        metering_valve=expansion_valve
+    )
 
 
 def calc_single_ejector_state():
-    ejector.state_primary = med_prop.calc_state("PT", 8.15e6, 35.2 + 273.15)
-    ejector.state_secondary = med_prop.calc_state("PT", 3.62e6, 21.6 + 273.15)
-    print(ejector.calc_m_flow(p_3=4210000, correlation=False) * 3600)
+    ejector.state_primary = med_prop.calc_state("PT", 7e6, 20 + 273.15)
+    ejector.state_secondary = med_prop.calc_state("PT", 2e6, -15 + 273.15)
+    print(ejector.calc_m_flow(p_3=2.5e6, correlation=False) * 3600)
 
     states = [ejector.state_primary,
               ejector.state_throat,
