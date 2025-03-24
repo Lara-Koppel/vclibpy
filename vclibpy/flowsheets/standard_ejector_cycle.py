@@ -140,3 +140,8 @@ class StandardEjectorCycle(BaseEjectorCycle, ABC):
             #    break
 
         return p_3
+
+    def get_all_components(self):
+        return super().get_all_components() + [
+            self.phase_seperator
+        ]
