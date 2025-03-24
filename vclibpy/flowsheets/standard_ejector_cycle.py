@@ -87,7 +87,7 @@ class StandardEjectorCycle(BaseEjectorCycle, ABC):
         num_iterations = 0
 
         # iterate p_ejector_outlet = p_3 to get matching m_flow from ejector and compressor
-        p_3 = (p_2 + p_1) / 2  #how to gues p_3?
+        p_3 = p_1+1e5  #  ToDO: How to gues p_3?
         while True:
             if isinstance(self.max_num_iterations, (int, float)):
                 if num_iterations > self.max_num_iterations:
