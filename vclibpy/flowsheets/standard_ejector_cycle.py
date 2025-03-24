@@ -144,3 +144,20 @@ class StandardEjectorCycle(BaseEjectorCycle, ABC):
         return super().get_all_components() + [
             self.phase_seperator
         ]
+
+    def get_states_in_order_for_plotting(self):
+        return [
+            self.ejector.state_outlet,
+            self.compressor.state_inlet,
+            self.compressor.state_outlet,
+            self.ejector.state_primary,
+            self.ejector.state_throat,
+            self.ejector.state_primary_mixing,
+            self.ejector.state_mixing,
+            self.ejector.state_outlet,
+            self.metering_valve.state_inlet,
+            self.metering_valve.state_outlet,
+            self.evaporator.state_outlet,
+            self.ejector.state_secondary,
+            self.ejector.state_mixing
+        ]
