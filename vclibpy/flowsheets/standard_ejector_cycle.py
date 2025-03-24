@@ -4,7 +4,6 @@ from abc import ABC
 
 import numpy as np
 
-from examples.e8_ejector import ejector
 from vclibpy.components.expansion_valves import ExpansionValve
 from vclibpy.components.phase_separator import PhaseSeparator
 from vclibpy.flowsheets.ejector_cycle import BaseEjectorCycle
