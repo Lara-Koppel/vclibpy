@@ -16,8 +16,25 @@ logger = logging.getLogger(__name__)
 
 
 class StandardEjectorCycle(BaseEjectorCycle, ABC):
+    """
+    Class for the standard ejector cycle
 
-    def __init__(self,metering_valve: ExpansionValve, phase_seperator = PhaseSeparator, **kwargs):
+    For this cycle, we have 7 relevant states:
+
+    - 1: Before compressor, after phase separator
+    - 2: Before condenser, after compressor
+    - 3: Before ejector, after condenser
+    - 4: Before ejector, after evaporator
+    - 5: Before phase separator, after ejector
+    - 6: Before metering valve, after phase separator
+    - 7: Before evaporator, after metering valve
+
+    Notes
+    -----
+    See parent docstring for info on further assumptions and parameters.
+    """
+
+    def __init__(self, phase_seperator: PhaseSeparator, **kwargs):
         """Initialize class with kwargs"""
         self.max_err = kwargs.pop("max_err", 0.5)
         self.min_iteration_step = kwargs.pop("min_iteration_step", 1)
@@ -25,7 +42,6 @@ class StandardEjectorCycle(BaseEjectorCycle, ABC):
         self.use_quick_solver = kwargs.pop("use_quick_solver", True)
         self.max_num_iterations = kwargs.pop("max_num_iterations", int(1e5))
         self.step_max = kwargs.pop("step_max", 10000)
-        self.metering_valve = metering_valve
         self.phase_seperator = phase_seperator
         super().__init__(**kwargs)
 
