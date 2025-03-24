@@ -63,17 +63,16 @@ class StandardEjectorCycle(BaseEjectorCycle, ABC):
         self.compressor.state_inlet = self.phase_seperator.state_outlet_vapor
         self.compressor.calc_state_outlet(p_outlet=p_2, inputs=inputs, fs_state=fs_state)
 
+        # Condenser inlet
+        self.condenser.state_inlet = self.compressor.state_outlet
+
         # Metering Valve
         self.metering_valve.state_inlet = self.phase_seperator.state_outlet_liquid
         self.metering_valve.calc_outlet(p_outlet=p_1)
 
         # Evaporator
-        _h_phase_seperator_liquid = self.med_prop.calc_state("PQ", self.ejector.state_outlet.p, 0).h
-        self.evaporator.state_inlet = self.med_prop.calc_state("PH", p_1, _h_phase_seperator_liquid)
-        self.evaporator.state_outlet = self.med_prop.calc_state("PQ", p_1, 1)
-
-        # Condenser inlet
-        self.condenser.state_inlet = self.compressor.state_outlet
+        self.evaporator.state_inlet = self.metering_valve.state_outlet
+        self.evaporator.state_outlet = self.ejector.state_secondary
 
     def iterate_p3(self, p_1, p_2, inputs, fs_state):
         # Settings
