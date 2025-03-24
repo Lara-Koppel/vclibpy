@@ -20,9 +20,9 @@ class BaseEjectorCycle(BaseCycle, abc.ABC):
     def __init__(self,
                  ejector: Ejector,
                  compressor: Compressor,
-                 expansion_valve: ExpansionValve,
+                 metering_valve: ExpansionValve,
                  **kwargs):
         super().__init__(**kwargs)
         self.ejector = ejector
         self.compressor = compressor
-        self.expansion_valve = expansion_valve
+        self.metering_valve = metering_valve
