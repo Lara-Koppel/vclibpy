@@ -25,8 +25,8 @@ class PhaseSeparator(TwoPortComponent):
             state_inlet (ThermodynamicState): Inlet state.
         """
         self._state_inlet = state_inlet
-        self.state_outlet_vapor = self.med_prop.calc_state("PQ", self.state_inlet.p, 1)
-        self.state_outlet_liquid = self.med_prop.calc_state("PQ", self.state_inlet.p, 0)
+        self._state_outlet_vapor = self.med_prop.calc_state("PQ", self._state_inlet.p, 1)
+        self._state_outlet_liquid = self.med_prop.calc_state("PQ", self._state_inlet.p, 0)
 
     @TwoPortComponent.state_outlet.setter
     def state_outlet(self, state: ThermodynamicState):
