@@ -162,3 +162,7 @@ class StandardEjectorCycle(BaseEjectorCycle, ABC):
             self.ejector.state_secondary,
             self.ejector.state_mixing
         ]
+
+    def calc_electrical_power(self, inputs: Inputs, fs_state: FlowsheetState):
+        """Based on simple energy balance - Adiabatic"""
+        return self.compressor.calc_electrical_power(inputs=inputs, fs_state=fs_state)
