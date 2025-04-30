@@ -8,6 +8,9 @@ from vclibpy.components.expansion_valves.ejector import Ejector
 from vclibpy.media import CoolProp, RefProp
 from vclibpy.utils.plotting import plot_cycle
 from vclibpy.flowsheets.standard_ejector_cycle import StandardEjectorCycle
+from vclibpy.media import ThermodynamicState
+from typing import List
+import pathlib
 import matplotlib.pyplot as plt
 import CoolProp.CoolProp as CP
 import plotly.graph_objects as go
@@ -21,7 +24,7 @@ except OSError:
     logging.warning("Could not load the custom matplotlib style file. Using default style.")
 
 
-med_prop = CoolProp(fluid_name="CarbonDioxide")
+med_prop = RefProp(fluid_name="CarbonDioxide")
 ejector = Ejector(1, 2.6, use_quick_solver=True)
 ejector.med_prop = med_prop
 
@@ -30,12 +33,19 @@ def main(use_condenser_inlet: bool = True):
     #m_flow_calculation('J:/Massenstromberechnungen/Daten_Ejektor_2.xlsx')
     #error_calculation_p_throat()
     #p_throat_iteration()
-    calc_single_ejector_state()
-
+    #calc_single_ejector_state()
+    test_standard_ejector_cycle()
+    #error_calculation_v_secondary_mixing()
 
 def test_standard_ejector_cycle():
     from vclibpy.components.heat_exchangers import moving_boundary_ntu
     from vclibpy.components.heat_exchangers import heat_transfer
+    from vclibpy.components.expansion_valves import Bernoulli
+    from vclibpy.components.compressors import RotaryCompressor
+    from vclibpy.components.phase_separator import PhaseSeparator
+    from vclibpy.datamodels import Inputs, FlowsheetState, RelativeCompressorSpeedControl, HeatExchangerInputs
+    from vclibpy.algorithms.iteration import Iteration
+
     condenser = moving_boundary_ntu.MovingBoundaryNTUCondenser(
         A=5,
         secondary_medium="water",
@@ -58,22 +68,49 @@ def test_standard_ejector_cycle():
         liquid_heat_transfer=heat_transfer.constant.ConstantHeatTransfer(alpha=5000),
         secondary_heat_transfer=heat_transfer.constant.ConstantHeatTransfer(alpha=25)
     )
-    from vclibpy.components.expansion_valves import Bernoulli
     expansion_valve = Bernoulli(A=0.01)
-    from vclibpy.components.compressors import RotaryCompressor
     compressor = RotaryCompressor(
         N_max=125,
         V_h=19e-6
     )
+    phase_seperator = PhaseSeparator()
 
     flowsheet = StandardEjectorCycle(
         evaporator=evaporator,
         condenser=condenser,
-        fluid="Propane",
+        fluid="CarbonDioxide",
         compressor=compressor,
-        expansion_valve=ejector,
-        metering_valve=expansion_valve
+        ejector=ejector,
+        metering_valve=expansion_valve,
+        phase_seperator=phase_seperator
     )
+    save_path = r"D:\00_temp\standard_ejector_cycle"
+    algorithm = Iteration(raise_errors=True, save_path_plots=save_path)
+    speed_control = RelativeCompressorSpeedControl(0.2, 0.0, 5.0)
+    eva_inputs = HeatExchangerInputs(T_in=0 + 273.15, m_flow=0.9)
+    con_inputs = HeatExchangerInputs(T_in=15 + 273.15, T_out=30 + 273.15)
+    inputs = Inputs(control=speed_control, evaporator=eva_inputs, condenser=con_inputs)
+    p_1_start, p_2_start, p_max, fs_state = algorithm.initial_setup(flowsheet, fluid=None, inputs=inputs)
+    #flowsheet.calc_states(1e6, 6e6, inputs, fs_state)
+    algorithm.calc_steady_state(flowsheet, inputs, "CarbonDioxide")
+    plot_cycle(flowsheet.med_prop, flowsheet.get_states_in_order_for_plotting(), show=True)
+    print(f"Compressor:")
+    print(f"m_flow = {flowsheet.compressor.m_flow * 3600} kg/h")
+    print(f"state_inlet = {flowsheet.compressor.state_inlet}")
+    print(f"state_outlet = {flowsheet.compressor.state_outlet}")
+    print(f"Ejector:")
+    print(f"m_flow_outlet = {flowsheet.ejector.m_flow_outlet * 3600} kg/h, m_flow_primary = {flowsheet.ejector.m_flow_primary * 3600} kg/h, m_flow_secondary = {flowsheet.ejector.m_flow_secondary * 3600} kg/h")
+    print(f"state_outlet = {flowsheet.ejector.state_outlet}")
+    print(f"state_primary = {flowsheet.ejector.state_primary}")
+    print(f"Condenser:")
+    print(f"m_flow = {flowsheet.condenser.m_flow * 3600} kg/h")
+    print(f"state_inlet = {flowsheet.condenser.state_inlet}")
+    print(f"state_outlet = {flowsheet.condenser.state_outlet}")
+    print(f"Evaporator:")
+    print(f"m_flow = {flowsheet.evaporator.m_flow * 3600} kg/h")
+    print(f"state_inlet = {flowsheet.evaporator.state_inlet}")
+    print(f"state_outlet = {flowsheet.evaporator.state_outlet}")
+
 
 
 def calc_single_ejector_state():
@@ -307,6 +344,86 @@ def error_calculation_p_throat():
     fig.update_layout(scene=dict(
         xaxis_title='Primary pressure',
         yaxis_title='Throat pressure',
+        zaxis_title='Error'
+    ))
+
+    # Mark positions where z is about 0
+    z_threshold = 0.01  # Define a threshold for z values close to 0
+    mask = numpy.abs(data) < z_threshold
+    fig.add_trace(go.Scatter3d(
+        x=x[mask],
+        y=y[mask],
+        z=data[mask],
+        mode='markers',
+        marker=dict(color='green', size=5),
+        name='z ≈ 0'
+    ))
+
+    # Save the plot as an HTML file
+    fig.write_html('J:/error_surface.html')
+
+    # To view the plot, open the HTML file in a web browser
+
+
+def error_calculation_v_secondary_mixing():
+    """When running: change in ejector.py: 1. check nozzle quality to return -1; 2. return error h_throat after calculation"""
+
+    # Define the range of throat pressures and primary pressures
+    v_secondary_mixing = numpy.arange(10, 150, 1)
+    p_outlet = numpy.arange(3e6, 4.5e6, 10000)
+
+    # Initialize the error list to store errors for each combination of throat and primary pressures
+    error_list = [[0] * len(v_secondary_mixing) for _ in range(len(p_outlet))]
+
+    ejector.use_quick_solver = True
+
+    # Set the primary state for the ejector
+    ejector.state_primary = med_prop.calc_state("PT", 9e6, 20 + 273.15)
+    ejector.state_secondary = med_prop.calc_state("PT", 3e6, -5 + 273.15)
+
+    # Iterate over each primary pressure
+    i, j = 0, 0
+    for p_3 in p_outlet:
+
+        # Iterate over each throat pressure
+        for v_s in v_secondary_mixing:
+            # Calculate the error for the current throat pressure and store it in the error list
+            error_list[i][j] = ejector.calc_m_flow(p_3, v_secondary_mixing_start=v_s)
+            j += 1
+        i += 1
+        j = 0
+        print(f"Progress: {i}/{len(p_outlet)}")
+
+    # Convert the error list to a numpy array for plotting
+    data = numpy.array(error_list).T
+
+    # Create a meshgrid for plotting
+    x = p_outlet
+    y = v_secondary_mixing
+    x, y = numpy.meshgrid(x, y)
+
+    # Plot the error surface
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    ax.plot_surface(x, y, data, cmap='viridis')
+
+    # Mark positions where z is about 0
+    z_threshold = 0.1  # Define a threshold for z values close to 0
+    mask = numpy.abs(data) < z_threshold
+    ax.scatter(x[mask], y[mask], data[mask], color='red', s=10, label='z ≈ 0', zorder=10)
+
+    ax.set_xlabel('Outlet pressure')
+    ax.set_ylabel('Secondary mixing velocity')
+    ax.set_zlabel('Error')
+    plt.show()
+
+    # Create a 3D surface plot
+    fig = go.Figure(data=[go.Surface(z=data, x=x, y=y)])
+
+    # Add labels
+    fig.update_layout(scene=dict(
+        xaxis_title='Outlet pressure',
+        yaxis_title='Secondary mixing velocity',
         zaxis_title='Error'
     ))
 
