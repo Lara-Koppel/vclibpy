@@ -66,6 +66,7 @@ class Ejector(ThreePortComponent):
     def calc_m_flow(self,
                     p_3,
                     p_throat_start=None,
+                    v_secondary_mixing_start=None,
                     correlation=False):
 
         if self.med_prop.fluid_name != "CarbonDioxide":
@@ -111,16 +112,16 @@ class Ejector(ThreePortComponent):
                                    A_secondary_mixing,
                                    v_primary_mixing,
                                    p_3,
-                                   v_secondary_mixing = None):  # Starting value for v_secondary_mixing
+                                   v_secondary_mixing_start = None):  # Starting value for v_secondary_mixing
         # We start the solving process by guessing the speed of the secondary flow at the mixing chamber inlet
-        if v_secondary_mixing is None:
-            v_secondary_mixing = 40.00 #ToDO: find out how to guess v_sm (about 40 m/s in graphs from Zhu 2017)
+        if v_secondary_mixing_start is None:
+            v_secondary_mixing_start = 40.00 #ToDO: find out how to guess v_sm (about 40 m/s in graphs from Zhu 2017)
 
         # Setup for iteration
         error_h_outlet_history = []
         num_iterations = 0
         iteration_multiplier = 0
-        last_v_sm = v_secondary_mixing
+        v_secondary_mixing = v_secondary_mixing_start
         if self.use_quick_solver:
             step_v_sm = self.v_step_max
         else:
