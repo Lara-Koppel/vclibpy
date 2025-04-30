@@ -25,8 +25,8 @@ class Ejector(ThreePortComponent):
     - flow inside ejector is steady and one-dimensional
     - ejector walls are adiabatic
     - inlet/outlet-flow velocity is neglected in the energy-conservation equation
-    - isentropic equations are used for the flow except in the mixing process
-    - mixing occurs at constant pressure
+    - polytropic equations are used for the flow except in the mixing process
+    - mixing occurs completely in the mixing chamber and under constant pressure
     - the two-phase flow in the suction chamber, mixing chamber
       and diffuser is homogeneous and is in thermodynamic equilibrium
     - primary nozzle flow becomes sonic in nozzle throat
