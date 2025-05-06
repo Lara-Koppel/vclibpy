@@ -3,8 +3,12 @@ import logging
 from vclibpy.media.ref_prop import RefProp
 from vclibpy.media.cool_prop import CoolProp
 import matplotlib.pyplot as plt
+import matplotlib as mpl
+from matplotlib import ticker
 import numpy as np
 import logging
+from typing import List
+from vclibpy.media import ThermodynamicState
 import progressbar
 
 try:
@@ -12,6 +16,7 @@ try:
 except OSError:
     logging.warning("Could not load the custom matplotlib style file. Using default style.")
 
+mpl.rcParams['svg.fonttype'] = 'none'  # make pyplot save text as text and not paths, so it is editable in Inkscape
 
 def plot_log_p_h_diagram(savepath: str,
                          p_bounds: tuple,
@@ -19,7 +24,8 @@ def plot_log_p_h_diagram(savepath: str,
                          fluid: str,
                          grid_size: int = 400,
                          isentropes=True,
-                         isothermes=True):
+                         isothermes=True,
+                         plot_states=False):
     """
     Create a log(p)-h diagram and save it as an SVG file.
 
@@ -31,7 +37,7 @@ def plot_log_p_h_diagram(savepath: str,
     """
 
     # Initialize the MedProp class
-    med_prop = RefProp(fluid)
+    med_prop = RefProp(fluid_name=fluid, use_error_check=False)
 
     # Generate pressure and enthalpy values
     p_values = np.logspace(np.log10(p_bounds[0]), np.log10(p_bounds[1]), grid_size)
@@ -58,11 +64,12 @@ def plot_log_p_h_diagram(savepath: str,
         bar.update(i+1)
 
     # Plot the log(p)-h diagram
-    plt.figure(figsize=(8, 6))
+    fig, ax = plt.subplots(figsize=(6.125, 6.125/4*3))
+
     if isothermes:
-        plt.contour(H/1e3, P/1e6, T, levels=np.arange(33.15, 463.15, 20), colors='grey', linewidths=0.8)
+        ax.contour(H/1e3, P/1e6, T, levels=np.arange(33.15, 463.15, 20), colors='grey', linewidths=0.8)
     if isentropes:
-        plt.contour(H/1e3, P/1e6, S/1e3, levels=np.arange(0, 5, 0.2), colors='grey', linewidths=0.8)
+        ax.contour(H/1e3, P/1e6, S/1e3, levels=np.arange(0, 5, 0.2), colors='grey', linewidths=0.8)
 
     phase_p = med_prop.get_two_phase_limits("p")
     phase_h = med_prop.get_two_phase_limits("h")
@@ -71,18 +78,71 @@ def plot_log_p_h_diagram(savepath: str,
         if p_bounds[0] < phase_p[i] < p_bounds[1] and h_bounds[0] < phase_h[i] < h_bounds[1]:
             phase[0].append(phase_h[i]/1e3)
             phase[1].append(phase_p[i]/1e6)
-    plt.plot(
+    ax.plot(
         phase[0], phase[1], color='black'
     )
 
-    plt.xlabel('h in kJ/kg')
-    plt.ylabel('log(p) in MPa')
-    plt.yscale('log')
-    plt.title(f'log(p)-h Diagram for {fluid}')
-    plt.grid(True)
+    # if plot_states:
+    #     states: List[ThermodynamicState] = []
+    #     states.append(med_prop.calc_state("PQ", 2e6, 1))
+    #     states.append(med_prop.calc_state("PS", 5e6, states[0].s))
+    #     states.append(med_prop.calc_state("PQ", 5e6, 0))
+    #     states.append(med_prop.calc_state("PH", 2e6, states[2].h))
+    #     states.append(states[0])
+    #     h = [state.h*1e-3 for state in states]
+    #     p = [state.p*1e-6 for state in states]
+    #     ax.plot(h, p, marker="o", color="r", zorder=10)
+
+    # if plot_states:
+    #     states: List[ThermodynamicState] = []
+    #     states.append(med_prop.calc_state("PQ", 3e6, 1))
+    #     states.append(med_prop.calc_state("PS", 10e6, states[0].s))
+    #     states.append(med_prop.calc_state("PT", 10e6, 310))
+    #     states.append(med_prop.calc_state("PH", 3e6, states[2].h))
+    #     states.append(states[0])
+    #     h = [state.h*1e-3 for state in states]
+    #     p = [state.p*1e-6 for state in states]
+    #     ax.plot(h, p, marker="o", color="r", zorder=10)
+
+    if plot_states:
+        # Plot states for transcritical CO2 Ejector cycle
+        states: List[ThermodynamicState] = []
+        states.append(med_prop.calc_state("PQ", 3.5e6, 0.6))
+        states.append(med_prop.calc_state("PQ", states[-1].p, 1))
+        states.append(med_prop.calc_state("PS", 10e6, states[-1].s))
+        states.append(med_prop.calc_state("PT", states[-1].p, 310))
+        states.append(med_prop.calc_state("PS", 2.8e6, states[-1].s))
+        states.append(med_prop.calc_state("PS", states[-1].p, states[0].s))
+        states.append(states[0])
+        states.append(med_prop.calc_state("PQ", states[0].p, 0))
+        states.append(med_prop.calc_state("PH", 3e6, states[-1].h))
+        states.append(med_prop.calc_state("PQ", states[-1].p, 1))
+        states.append(med_prop.calc_state("PS", states[4].p, states[-1].s))
+        states.append(states[5])
+
+        h = [state.h*1e-3 for state in states]
+        p = [state.p*1e-6 for state in states]
+        ax.plot(h, p, marker="o", color="r", zorder=10)
+
+
+    ax.set_xlabel('h in kJ/kg')
+    ax.set_ylabel('log(p) in MPa')
+    ax.set_yscale('log')
+
+    # Function for formatting the axis labels
+    def custom_formatter(x, pos):
+        return f'{int(x)}'  # Converts tick value to integer
+
+    # Change the ticker format
+    ax.yaxis.set_major_formatter(ticker.FuncFormatter(custom_formatter))
+    ax.yaxis.set_minor_formatter(ticker.FuncFormatter(custom_formatter))
+
+    #plt.title(f'log(p)-h Diagram for {fluid}')
+    ax.grid(visible=True, which='both', zorder=0)
 
     # Save the plot as an SVG file
-    plt.savefig(savepath, format='svg')
+    fig.savefig(savepath, format='svg')
+    plt.show()
     plt.close()
 
 
