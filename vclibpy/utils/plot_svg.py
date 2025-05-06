@@ -5,6 +5,7 @@ from vclibpy.media.cool_prop import CoolProp
 import matplotlib.pyplot as plt
 import numpy as np
 import logging
+import progressbar
 
 try:
     plt.style.use('D:/kbr-fme/ebc.paper.mplstyle')
@@ -41,6 +42,8 @@ def plot_log_p_h_diagram(savepath: str,
     T = np.zeros_like(P)
     S = np.zeros_like(P)
 
+    bar = progressbar.ProgressBar(max_value=P.shape[0])
+
     # Calculate temperature for each (p, h) pair
     for i in range(P.shape[0]):
         for j in range(P.shape[1]):
@@ -52,7 +55,7 @@ def plot_log_p_h_diagram(savepath: str,
                 T[i, j] = np.nan
                 S[i, j] = np.nan
                 logging.warning(f"Failed to calculate temperature for (P, H) = ({P[i, j]}, {H[i, j]}): {e}")
-        print(f"Progress: {i + 1}/{P.shape[0]}")
+        bar.update(i+1)
 
     # Plot the log(p)-h diagram
     plt.figure(figsize=(8, 6))
