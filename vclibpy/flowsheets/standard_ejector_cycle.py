@@ -73,7 +73,40 @@ class StandardEjectorCycle(BaseEjectorCycle, ABC):
 
         # Evaporator
         self.evaporator.state_inlet = self.metering_valve.state_outlet
-        self.evaporator.state_outlet = self.ejector.state_secondary
+
+        # Mass flow rates:
+        self.condenser.m_flow = self.ejector.m_flow_outlet * self.ejector.state_outlet.q
+        self.metering_valve.m_flow = self.ejector.m_flow_outlet * (1 - self.ejector.state_outlet.q)
+        self.evaporator.m_flow = self.metering_valve.m_flow
+
+        fs_state.set(
+            name="T_1", value=self.compressor.state_inlet.T,
+            unit="K", description="Refrigerant temperature at compressor inlet"
+        )
+        fs_state.set(
+            name="T_2", value=self.compressor.state_outlet.T,
+            unit="K", description="Refrigerant temperature at compressor outlet"
+        )
+        fs_state.set(
+            name="T_3", value=self.condenser.state_outlet.T,
+            unit="K", description="Refrigerant temperature at condenser outlet"
+        )
+        fs_state.set(
+            name="T_4", value=self.evaporator.state_outlet.T,
+            unit="K", description="Refrigerant temperature at evaporator outlet"
+        )
+        fs_state.set(
+            name="p_con", value=p_2,
+            unit="Pa", description="Condensation pressure"
+        )
+        fs_state.set(
+            name="p_eva", value=p_1,
+            unit="Pa", description="Evaporation pressure"
+        )
+        fs_state.set(
+            name="p_middle", value=p_3,
+            unit="Pa", description="Pressure between ejector and compressor"
+        )
 
     def iterate_p3(self, p_1, p_2, inputs, fs_state):
         # Settings
