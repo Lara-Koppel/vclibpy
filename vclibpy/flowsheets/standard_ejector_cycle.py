@@ -55,7 +55,8 @@ class StandardEjectorCycle(BaseEjectorCycle, ABC):
         self.ejector.state_secondary = self.evaporator.state_outlet
 
         p_3 = self.iterate_p3(p_1, p_2, inputs, fs_state)
-
+        if p_3 == -1:
+            return
         # Phase Separator
         self.phase_seperator.state_inlet = self.ejector.state_outlet
 
@@ -99,8 +100,9 @@ class StandardEjectorCycle(BaseEjectorCycle, ABC):
                     logger.info("Info: %s percent of max_num_iterations for p_3 %s used",
                                 100 * (num_iterations + 1) / self.max_num_iterations, self.max_num_iterations)
 
-            p_3_history.append(p_3 / 1e5)
-            error_m_flow_history.append(error_m_flow)
+            if p_3 < p_1:
+                logger.error("p_3 is smaller than p_1 - Configuration is infeasible. Stopping.")
+                return -1
 
             # increase counter
             num_iterations += 1
@@ -138,7 +140,7 @@ class StandardEjectorCycle(BaseEjectorCycle, ABC):
             #if len(p_3_unique) == 2 and step_p3 == self.min_iteration_step:
             #    logger.critical("Breaking: p_3 not converging at all")
             #    break
-
+        #print(f"p_3 converged after {num_iterations} iterations. p_3 = {p_3}")
         return p_3
 
     def get_all_components(self):
