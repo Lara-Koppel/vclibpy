@@ -1,7 +1,7 @@
 import abc
 
 from vclibpy.flowsheets import BaseCycle
-from vclibpy.components.expansion_valves.ejector import Ejector
+from vclibpy.components.expansion_valves import Ejector
 from vclibpy.components.compressors import Compressor
 from vclibpy.components.expansion_valves import ExpansionValve
 
