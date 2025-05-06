@@ -60,9 +60,9 @@ class StandardEjectorCycle(BaseEjectorCycle, ABC):
         # Phase Separator
         self.phase_seperator.state_inlet = self.ejector.state_outlet
 
-        # Compressor
-        self.compressor.state_inlet = self.phase_seperator.state_outlet_vapor
-        self.compressor.calc_state_outlet(p_outlet=p_2, inputs=inputs, fs_state=fs_state)
+        # # Compressor
+        # self.compressor.state_inlet = self.phase_seperator.state_outlet_vapor
+        # self.compressor.calc_state_outlet(p_outlet=p_2, inputs=inputs, fs_state=fs_state)
 
         # Condenser inlet
         self.condenser.state_inlet = self.compressor.state_outlet
@@ -141,20 +141,25 @@ class StandardEjectorCycle(BaseEjectorCycle, ABC):
             num_iterations += 1
 
             m_flow_ejector = self.ejector.calc_m_flow(p_3)
+            m_flow_ejector_vapor = m_flow_ejector * self.ejector.state_outlet.q
             self.compressor.state_inlet = self.med_prop.calc_state("PQ", p_3, 1)
+            self.compressor.calc_state_outlet(p_2, inputs, fs_state)
             m_flow_compressor = self.compressor.calc_m_flow(inputs, fs_state)
-            error_m_flow = m_flow_ejector - m_flow_compressor
+            error_m_flow = m_flow_ejector_vapor - m_flow_compressor
+            error_m_flow_history.append(error_m_flow)
+            p_3_history.append(p_3 / 1e5)
 
-            if error_m_flow < 0:
-                p_3 -= step_p3
-                continue
-            else:
-                if step_p3 > self.min_iteration_step:
-                    p_3 += step_p3
+            #print(f"Iteration {num_iterations}: p_3 = {p_3}, error_m_flow = {error_m_flow}")
+            #print(p_1, p_2)
+
+            if abs(error_m_flow) > self.max_err or step_p3 > self.min_iteration_step:
+                if num_iterations > 2 and np.sign(error_m_flow_history[-1]) != np.sign(error_m_flow_history[-2]):
                     step_p3 /= 10
+                    #print(f"Last errors: {error_m_flow_history[-1]}, {error_m_flow_history[-2]}; decreasing step to {step_p3}")
+                if error_m_flow < 0:
+                    p_3 -= step_p3
                     continue
-                elif error_m_flow > self.max_err:
-                    step_p3 = 1000
+                else:
                     p_3 += step_p3
                     continue
 
