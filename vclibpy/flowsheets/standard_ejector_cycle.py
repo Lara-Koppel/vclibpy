@@ -6,7 +6,7 @@ import numpy as np
 
 from vclibpy.components.expansion_valves import ExpansionValve
 from vclibpy.components.phase_separator import PhaseSeparator
-from vclibpy.flowsheets.ejector_cycle import BaseEjectorCycle
+from vclibpy.flowsheets import BaseEjectorCycle
 from vclibpy.media import ThermodynamicState
 from vclibpy import Inputs, FlowsheetState
 
