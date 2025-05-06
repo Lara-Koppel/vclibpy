@@ -104,9 +104,10 @@ class Ejector(ThreePortComponent):
         # For this we have a nonlinear equation system we need to solve numerically
         # 7: Calculate secondary mass flow, thermodynamic state in mixing chamber and at outlet
         #    and velocities in mixing chamber
-        self.iterate_v_secondary_mixing(A_secondary_mixing, v_primary_mixing, p_3)
-        print(self.m_flow_primary*3600, self.m_flow_secondary*3600)
-        return self.m_flow_primary + self.m_flow_secondary
+        self.iterate_v_secondary_mixing(A_secondary_mixing, v_primary_mixing, p_3, v_secondary_mixing_start)
+        #print(self.m_flow_primary*3600, self.m_flow_secondary*3600)
+        self.m_flow_outlet = self.m_flow_primary + self.m_flow_secondary
+        return self.m_flow_outlet
 
     def iterate_v_secondary_mixing(self,
                                    A_secondary_mixing,
@@ -141,7 +142,8 @@ class Ejector(ThreePortComponent):
                                 100 * (num_iterations + 1) / self.max_num_iterations, self.max_num_iterations)
             # Check if v_secondary_mixing is negative, if so, stop and raise error
             if v_secondary_mixing < 0:
-                logger.error("v_secondary_mixing is negative. Stopping.") #  ToDO: Check what happens if v_secondary_mixing is close to zero
+                logger.error("v_secondary_mixing is negative - Configuration is infeasible. Stopping.") #  ToDO: Check what happens if v_secondary_mixing is close to zero
+                self.m_flow_secondary = None
                 return
 
             self.m_flow_secondary = A_secondary_mixing*self.state_secondary.d*v_secondary_mixing
@@ -160,6 +162,7 @@ class Ejector(ThreePortComponent):
             error_h_outlet = (h_outlet_2/h_outlet-1)*100
             error_h_outlet_history.append(error_h_outlet)
             #print(f"Iteration {num_iterations}: v_secondary_mixing = {v_secondary_mixing}; v_mixing = {v_mixing}; error_h_outlet = {error_h_outlet}")
+            #return error_h_outlet
 
             if abs(error_h_outlet) > self.max_err or step_v_sm > self.v_step_min:
                 # In the first two iteration steps we need to find out in which direction to adjust v_secondary_mixing
@@ -199,7 +202,7 @@ class Ejector(ThreePortComponent):
             else:
                 # The error and step_v_sm are smaller than max_error and v_step_min. We can break.
                 self.state_outlet = self.med_prop.calc_state("PH", p_3, h_outlet)
-                #print(f"v_secondary_mixing = {v_secondary_mixing}; converged after {num_iterations} iterations")
+                #print(f"v_secondary_mixing = {v_secondary_mixing}; converged after {num_iterations} iterations with error: {error_h_outlet}")
                 return
 
     def iterate_throat_pressure(self, p_throat_start=None, correlation=False):
@@ -237,7 +240,7 @@ class Ejector(ThreePortComponent):
 
             # 1a: Calculate specific enthalpy inside Nozzle throat from isentropic efficiency
             h_throat_isentropic = self.med_prop.calc_state("PS", self.p_throat, self.state_primary.s).h
-            h_throat = self.state_primary.h - self.phi_n*(self.state_primary.h - h_throat_isentropic)
+            h_throat = self.state_primary.h - self.phi_n*(self.state_primary.h - h_throat_isentropic) #ToDO: Wirkungsgrade auf eta ändern
 
             # 1b: Calculate speed of sound for two phase flow inside throat
             # State calculation inside throat
