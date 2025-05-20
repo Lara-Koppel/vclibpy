@@ -75,7 +75,7 @@ class Ejector(ThreePortComponent):
 
         # Starting with calculations inside the primary nozzle
         # 1: Iterate Pressure inside nozzle throat
-        self.state_throat, c_throat = self.iterate_throat_pressure(p_throat_start, correlation=correlation)
+        self.state_throat, c_throat = self.iterate_throat_pressure(p_throat_start, correlation=correlation, QNE=QNE)
 
         # 2: Now that we know p_throat, we can continue with calculating the mass flow through the primary nozzle
         self.m_flow_primary = math.pi*(self.d_throat*10**-3)**2/4*self.state_throat.d*c_throat
