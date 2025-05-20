@@ -67,7 +67,8 @@ class Ejector(ThreePortComponent):
                     p_3,
                     p_throat_start=None,
                     v_secondary_mixing_start=None,
-                    correlation=False):
+                    correlation=False,
+                    QNE = False):
 
         if self.med_prop.fluid_name != "CarbonDioxide":
             raise NotImplementedError("Current ejector model only valid for CarbonDioxide")
@@ -284,9 +285,12 @@ class Ejector(ThreePortComponent):
             # Speed of sound for two phase flow
             c_throat = (state_throat.d*x_1 + (state_throat.d/state_throat.T)*x_2)**-0.5  #
             # 1c: Calculate specific enthalpy using energy balance - assume Ma_throat = 1
-            Q_NE = 2500*math.e**(-10*(state_throat.q))  # Correlation for non-equilibrium phase change
+            Q_NE = 8629*math.e**(-10*(state_throat.q))  # Correlation for non-equilibrium phase change
             #print(f"liquid mass fraction: {1-state_throat.q}, Q_NE = {Q_NE}")
-            h_throat_2 = self.state_primary.h - c_throat**2/2 #+ Q_NE
+            if QNE:
+                h_throat_2 = self.state_primary.h - c_throat**2/2 + Q_NE
+            else:
+                h_throat_2 = self.state_primary.h - c_throat**2/2
 
             # Calculate error between two calculations for h_throat
             error_h_throat = (h_throat_2/h_throat-1)*100
