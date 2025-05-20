@@ -37,6 +37,8 @@ class BaseCycle:
         self.condenser = condenser
         # Instantiate dummy values
         self.med_prop = None
+        # Add helper to improve log levels
+        self.iteration_converged = False
 
     def __str__(self):
         return self.flowsheet_name
@@ -226,7 +228,7 @@ class BaseCycle:
         )
         fs_state.set(
             name="eta_glob", value=fs_state.get("eta_is").value * fs_state.get("eta_mech").value,
-            unit="%", description="Global compressor efficiency"
+            unit="-", description="Global compressor efficiency"
         )
 
     def calculate_outputs_for_valid_pressures(
