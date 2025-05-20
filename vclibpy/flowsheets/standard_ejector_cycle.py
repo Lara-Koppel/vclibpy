@@ -116,7 +116,72 @@ class StandardEjectorCycle(BaseEjectorCycle, ABC):
             unit="Pa", description="Pressure between ejector and compressor"
         )
 
-    def iterate_p3(self, p_1, p_2, inputs, fs_state):
+    def iterate_p3(self, p_1, p_2, inputs: Inputs, fs_state: FlowsheetState):
+        """
+        Iterate p_3 to get matching m_flow for ejector inlets and outlet
+        """
+        # Settings
+        if self.use_quick_solver:
+            step_p3 = self.step_max
+        else:
+            step_p3 = self.min_iteration_step
+
+        p_3_history = []
+        error_m_flow_history = []
+        error_m_flow = np.nan
+        num_iterations = 0
+
+        # iterate p_ejector_outlet = p_3 to get matching m_flow from ejector and compressor
+        p_3 = p_1 + 1e5  # ToDO: How to gues p_3?
+        while True:
+            if isinstance(self.max_num_iterations, (int, float)):
+                if num_iterations > self.max_num_iterations:
+                    logger.warning("Maximum number of iterations for p_3 %s exceeded. Stopping.",
+                                   self.max_num_iterations)
+                    return
+
+                if (num_iterations + 1) % (0.1 * self.max_num_iterations) == 0:
+                    logger.info("Info: %s percent of max_num_iterations for p_3 %s used",
+                                100 * (num_iterations + 1) / self.max_num_iterations, self.max_num_iterations)
+
+            if p_3 < p_1:
+                logger.error("p_3 is smaller than p_1 - Configuration is infeasible. Stopping.")
+                return -1
+
+            # increase counter
+            num_iterations += 1
+
+            m_flow_ejector = self.ejector.calc_m_flow(p_3)
+            m_flow_ejector_vapor = m_flow_ejector * self.ejector.state_outlet.q
+            error_m_flow = m_flow_ejector_vapor - self.ejector.m_flow_primary
+            error_m_flow_history.append(error_m_flow)
+            p_3_history.append(p_3 / 1e5)
+
+            # print(f"p_3 Iteration {num_iterations}: p_3 = {p_3}, error_m_flow = {error_m_flow}")
+            # print(p_1, p_2)
+
+            if abs(error_m_flow) > self.max_err or step_p3 > self.min_iteration_step:
+                if num_iterations > 2 and np.sign(error_m_flow_history[-1]) != np.sign(error_m_flow_history[-2]):
+                    step_p3 /= 10
+                    # print(f"Last errors: {error_m_flow_history[-1]}, {error_m_flow_history[-2]}; decreasing step to {step_p3}")
+                if error_m_flow < 0:
+                    p_3 -= step_p3
+                    continue
+                else:
+                    p_3 += step_p3
+                    continue
+
+
+            logger.info("Breaking: p_3 Converged")
+            break
+        print(f"p_3 converged after {num_iterations} iterations. p_3 = {p_3}")
+        self.compressor.state_inlet = self.med_prop.calc_state("PQ", p_3, 1)
+        self.compressor.calc_state_outlet(p_2, inputs, fs_state)
+        self.compressor.m_flow = self.ejector.m_flow_outlet * self.ejector.state_outlet.q  #ToDO: Calculate corresponding n, as it is fixed for stationary operation
+        return p_3
+
+    def iterate_p3_old(self, p_1, p_2, inputs, fs_state):
+        """Iterate p_3 to get matching m_flow from ejector and compressor - does not work"""
         # Settings
         if self.use_quick_solver:
             step_p3 = self.step_max
