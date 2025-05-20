@@ -104,21 +104,26 @@ def plot_log_p_h_diagram(savepath: str,
     #     p = [state.p*1e-6 for state in states]
     #     ax.plot(h, p, marker="o", color="r", zorder=10)
 
+    # if plot_states:
+    #     # Plot states for transcritical CO2 Ejector cycle
+    #     states: List[ThermodynamicState] = []
+    #     states.append(med_prop.calc_state("PQ", 3.5e6, 0.6))
+    #     states.append(med_prop.calc_state("PQ", states[-1].p, 1))
+    #     states.append(med_prop.calc_state("PS", 10e6, states[-1].s))
+    #     states.append(med_prop.calc_state("PT", states[-1].p, 310))
+    #     states.append(med_prop.calc_state("PS", 2.8e6, states[-1].s))
+    #     states.append(med_prop.calc_state("PS", states[-1].p, states[0].s))
+    #     states.append(states[0])
+    #     states.append(med_prop.calc_state("PQ", states[0].p, 0))
+    #     states.append(med_prop.calc_state("PH", 3e6, states[-1].h))
+    #     states.append(med_prop.calc_state("PQ", states[-1].p, 1))
+    #     states.append(med_prop.calc_state("PS", states[4].p, states[-1].s))
+    #     states.append(states[5])
+
     if plot_states:
-        # Plot states for transcritical CO2 Ejector cycle
+        # Plot states for ejector
         states: List[ThermodynamicState] = []
-        states.append(med_prop.calc_state("PQ", 3.5e6, 0.6))
-        states.append(med_prop.calc_state("PQ", states[-1].p, 1))
-        states.append(med_prop.calc_state("PS", 10e6, states[-1].s))
-        states.append(med_prop.calc_state("PT", states[-1].p, 310))
-        states.append(med_prop.calc_state("PS", 2.8e6, states[-1].s))
-        states.append(med_prop.calc_state("PS", states[-1].p, states[0].s))
-        states.append(states[0])
-        states.append(med_prop.calc_state("PQ", states[0].p, 0))
-        states.append(med_prop.calc_state("PH", 3e6, states[-1].h))
-        states.append(med_prop.calc_state("PQ", states[-1].p, 1))
-        states.append(med_prop.calc_state("PS", states[4].p, states[-1].s))
-        states.append(states[5])
+
 
         h = [state.h*1e-3 for state in states]
         p = [state.p*1e-6 for state in states]
