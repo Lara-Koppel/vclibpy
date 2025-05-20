@@ -96,6 +96,14 @@ class StandardEjectorCycle(BaseEjectorCycle, ABC):
             unit="K", description="Refrigerant temperature at evaporator outlet"
         )
         fs_state.set(
+            name="h_mixing", value=self.ejector.state_mixing.h,
+            unit="J/kgK", description="Specific enthalpy at mixing chamber outlet"
+        )
+        fs_state.set(
+            name="h_ejector", value=self.ejector.state_outlet.h,
+            unit="J/kgK", description="Specific enthalpy at ejector outlet"
+        )
+        fs_state.set(
             name="p_con", value=p_2,
             unit="Pa", description="Condensation pressure"
         )
