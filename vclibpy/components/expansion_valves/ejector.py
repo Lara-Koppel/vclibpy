@@ -167,46 +167,46 @@ class Ejector(ThreePortComponent):
 
             if abs(error_h_outlet) > self.max_err or step_v_sm > self.v_step_min:
                 # In the first two iteration steps we need to find out in which direction to adjust v_secondary_mixing
-                if num_iterations == 1:
-                    # Assume, that we have to increase v_secondary_mixing to decrease the value of the error
-                    if error_h_outlet > 0:
-                        v_secondary_mixing += step_v_sm
-                        continue
-                    else:
-                        v_secondary_mixing -= step_v_sm
-                        continue
-                elif num_iterations == 2:
-                    factor_error = error_h_outlet_history[-1] / error_h_outlet_history[-2]
-                    # Test whether assumption was right, otherwise change direction of p_throat-adjustments
-                    if factor_error > 1:
-                        iteration_multiplier = -1
-                    else:
-                        iteration_multiplier = 1
+                # if num_iterations == 1:
+                #     # Assume, that we have to increase v_secondary_mixing to decrease the value of the error
+                #     if error_h_outlet > 0:
+                #         v_secondary_mixing += step_v_sm
+                #         continue
+                #     else:
+                #         v_secondary_mixing -= step_v_sm
+                #         continue
+                # elif num_iterations == 2:
+                #     factor_error = error_h_outlet_history[-1] / error_h_outlet_history[-2]
+                #     # Test whether assumption was right, otherwise change direction of p_throat-adjustments
+                #     if factor_error > 1:
+                #         iteration_multiplier = -1
+                #     else:
+                #         iteration_multiplier = 1
+                #
+                #     if error_h_outlet > 0:
+                #         v_secondary_mixing += iteration_multiplier * step_v_sm
+                #         continue
+                #     else:
+                #         v_secondary_mixing -= iteration_multiplier * step_v_sm
+                #         continue
+                # else:
+                if num_iterations > 2 and numpy.sign(error_h_outlet_history[-1]) != numpy.sign(error_h_outlet_history[-2]):
+                    # If there was a sign change in the error, decrease the step size
+                    step_v_sm /= 10
 
-                    if error_h_outlet > 0:
-                        v_secondary_mixing += iteration_multiplier * step_v_sm
-                        continue
-                    else:
-                        v_secondary_mixing -= iteration_multiplier * step_v_sm
-                        continue
+                if error_h_outlet > 0:
+                    v_secondary_mixing += step_v_sm
+                    continue
                 else:
-                    if numpy.sign(error_h_outlet_history[-1]) != numpy.sign(error_h_outlet_history[-2]):
-                        # If there was a sign change in the error, decrease the step size
-                        step_v_sm /= 10
-
-                    if error_h_outlet > 0:
-                        v_secondary_mixing += iteration_multiplier * step_v_sm
-                        continue
-                    else:
-                        v_secondary_mixing -= iteration_multiplier * step_v_sm
-                        continue
+                    v_secondary_mixing -= step_v_sm
+                    continue
             else:
                 # The error and step_v_sm are smaller than max_error and v_step_min. We can break.
                 self.state_outlet = self.med_prop.calc_state("PH", p_3, h_outlet)
                 #print(f"v_secondary_mixing = {v_secondary_mixing}; converged after {num_iterations} iterations with error: {error_h_outlet}")
                 return
 
-    def iterate_throat_pressure(self, p_throat_start=None, correlation=False):
+    def iterate_throat_pressure(self, p_throat_start=None, correlation=False, QNE=False):
         use_correlation = False  # Flag to indicate whether to use correlation without iterating p_throat
         if p_throat_start is None:
             # Use correlation from paper to guess first value of p_throat
@@ -216,6 +216,8 @@ class Ejector(ThreePortComponent):
                     and 300 < self.state_primary.d < 750 and correlation):
                 use_correlation = True  # Within the boundary in the if-statement the correlation is valid
         self.p_throat = p_throat_start
+        if correlation and not (7.6e6 < self.state_primary.p < 10.3e6 and 2+273.15 < self.state_primary.T < 43.4+273.15 and 300 < self.state_primary.d < 750):
+            logger.warning("p_throat correlation not valid. Using iteration instead.")
         #print(f"p_throat_start: {p_throat_start}")
         # Setup for iteration
         error_h_throat_history = []
@@ -248,7 +250,7 @@ class Ejector(ThreePortComponent):
             state_throat = self.med_prop.calc_state("PH", self.p_throat, h_throat)
 
             if not 0 < state_throat.q < 1:
-                logger.warning("Nozzle throat state not inside two-phase region. Stopping")
+                logger.warning("Nozzle throat state not inside two-phase region. Stopping")  # ToDO: Error handling
                 #return -1
 
             state_throat_vapor = self.med_prop.calc_state("PQ", self.p_throat, 1)
