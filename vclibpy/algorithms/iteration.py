@@ -148,7 +148,7 @@ class Iteration(Algorithm):
                 ax_iterations[2, 0].scatter(iterations, p_1_history[plot_last:])
                 ax_iterations[2, 1].scatter(iterations, p_2_history[plot_last:])
                 plt.draw()
-                plt.pause(1e-5)
+                plt.pause(1e-3)
 
             # Increase counter
             num_iterations += 1
@@ -202,43 +202,35 @@ class Iteration(Algorithm):
                     and not np.isclose(p_1, p_1_history[-2]))\
                     and not step_p1 <= 0.5 * step_p2:
                 step_p1 /= 10
-                #continue
             if (np.sign(error_con) != np.sign(error_con_history[-1])
                     and num_iterations > 1
                     and not np.isclose(p_2, p_2_history[-2]))\
                     and not step_p2 <= 0.5 * step_p1:
                 step_p2 /= 10
-                #continue
 
             # Check which heat exchanger has the bigger error. The corresponding pressure gets updated
             # if abs(error_eva) > abs(error_con):
             if error_eva < 0:
                 p_1_next = p_1 - step_p1
-                # continue
             else:
                 if step_p1 > self.min_iteration_step:
                     p_1_next = p_1 + step_p1
-                   # continue
                 # Only increase if the error is bigger than zero (or the allowed error) and
                 # there is still a temperature difference left to change.
                 elif error_eva > self.max_err and dT_min_eva > self.min_allowed_dT_min:
                     step_p1 = 1000
                     p_1_next = p_1 + step_p1
-                    # continue
             # else:
             if error_con < 0:
                 p_2_next = p_2 + step_p2
-                # continue
             else:
                 if step_p2 > self.min_iteration_step:
                     p_2_next = p_2 - step_p2
-                   # continue
                 # Only decrease if the error is bigger than zero (or the allowed error) and
                 # there is still a temperature difference left to change.
                 elif error_con > self.max_err and dT_min_con > self.min_allowed_dT_min:
                     p_2_next = p_2 - step_p2
                     step_p2 = 1000
-                    # continue
 
             # If still here, and the values are equal, we may break.
             if p_1 == p_1_next and p_2 == p_2_next:

@@ -1,13 +1,10 @@
-import math
 import logging
 from abc import ABC
 
 import numpy as np
 
-from vclibpy.components.expansion_valves import ExpansionValve
 from vclibpy.components.phase_separator import PhaseSeparator
 from vclibpy.flowsheets import BaseEjectorCycle
-from vclibpy.media import ThermodynamicState
 from vclibpy import Inputs, FlowsheetState
 
 
@@ -59,10 +56,6 @@ class StandardEjectorCycle(BaseEjectorCycle, ABC):
             return
         # Phase Separator
         self.phase_seperator.state_inlet = self.ejector.state_outlet
-
-        # # Compressor
-        # self.compressor.state_inlet = self.phase_seperator.state_outlet_vapor
-        # self.compressor.calc_state_outlet(p_outlet=p_2, inputs=inputs, fs_state=fs_state)
 
         # Condenser inlet
         self.condenser.state_inlet = self.compressor.state_outlet
@@ -157,13 +150,10 @@ class StandardEjectorCycle(BaseEjectorCycle, ABC):
             error_m_flow_history.append(error_m_flow)
             p_3_history.append(p_3 / 1e5)
 
-            # print(f"p_3 Iteration {num_iterations}: p_3 = {p_3}, error_m_flow = {error_m_flow}")
-            # print(p_1, p_2)
-
             if abs(error_m_flow) > self.max_err or step_p3 > self.min_iteration_step:
                 if num_iterations > 2 and np.sign(error_m_flow_history[-1]) != np.sign(error_m_flow_history[-2]):
                     step_p3 /= 10
-                    # print(f"Last errors: {error_m_flow_history[-1]}, {error_m_flow_history[-2]}; decreasing step to {step_p3}")
+
                 if error_m_flow < 0:
                     p_3 -= step_p3
                     continue
@@ -222,13 +212,10 @@ class StandardEjectorCycle(BaseEjectorCycle, ABC):
             error_m_flow_history.append(error_m_flow)
             p_3_history.append(p_3 / 1e5)
 
-            #print(f"Iteration {num_iterations}: p_3 = {p_3}, error_m_flow = {error_m_flow}")
-            #print(p_1, p_2)
-
             if abs(error_m_flow) > self.max_err or step_p3 > self.min_iteration_step:
                 if num_iterations > 2 and np.sign(error_m_flow_history[-1]) != np.sign(error_m_flow_history[-2]):
                     step_p3 /= 10
-                    #print(f"Last errors: {error_m_flow_history[-1]}, {error_m_flow_history[-2]}; decreasing step to {step_p3}")
+
                 if error_m_flow < 0:
                     p_3 -= step_p3
                     continue
@@ -236,22 +223,8 @@ class StandardEjectorCycle(BaseEjectorCycle, ABC):
                     p_3 += step_p3
                     continue
 
-            # If still here, and the values are equal, we may break.
-            #if p_3 == p_3_next:
-                # Check if solution was too far away. If so, jump back
-                # And decrease the iteration step by factor 10.
-                #if step_p3 > self.min_iteration_step:
-                    #p_3_next = p_3 + step_p3
-                    #step_p3 /= 10
-                    #continue
             logger.info("Breaking: p_3 Converged")
             break
-            # Check if values are not converging at all:
-            #p_3_unique = set(p_3_history[-10:])
-            #if len(p_3_unique) == 2 and step_p3 == self.min_iteration_step:
-            #    logger.critical("Breaking: p_3 not converging at all")
-            #    break
-        #print(f"p_3 converged after {num_iterations} iterations. p_3 = {p_3}")
         return p_3
 
     def get_all_components(self):
