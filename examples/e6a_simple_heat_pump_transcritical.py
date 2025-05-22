@@ -124,6 +124,270 @@ def main(use_condenser_inlet: bool = True):
         flowsheets=["StandardTranscritical"]
     )
 
+def calculate_single_point():
+    from vclibpy.flowsheets import StandardCycleTranscritical
+    from vclibpy.components.heat_exchangers import moving_boundary_ntu
+    from vclibpy.components.heat_exchangers import heat_transfer
+    from vclibpy.algorithms.iteration import Iteration
+
+    condenser = moving_boundary_ntu.MovingBoundaryNTUGasCooler(
+        A=30,
+        secondary_medium="air",
+        flow_type="counter",
+        ratio_outer_to_inner_area=10,
+        two_phase_heat_transfer=heat_transfer.constant.ConstantTwoPhaseHeatTransfer(alpha=1000),
+        gas_heat_transfer=heat_transfer.constant.ConstantHeatTransfer(alpha=1000),
+        wall_heat_transfer=heat_transfer.wall.WallTransfer(lambda_=236, thickness=2e-3),
+        liquid_heat_transfer=heat_transfer.constant.ConstantHeatTransfer(alpha=5000),
+        secondary_heat_transfer=heat_transfer.constant.ConstantHeatTransfer(alpha=25)
+    )
+    evaporator = moving_boundary_ntu.MovingBoundaryNTUEvaporator(
+        A=30,
+        secondary_medium="air",
+        flow_type="counter",
+        ratio_outer_to_inner_area=10,
+        two_phase_heat_transfer=heat_transfer.constant.ConstantTwoPhaseHeatTransfer(alpha=1000),
+        gas_heat_transfer=heat_transfer.constant.ConstantHeatTransfer(alpha=1000),
+        wall_heat_transfer=heat_transfer.wall.WallTransfer(lambda_=236, thickness=2e-3),
+        liquid_heat_transfer=heat_transfer.constant.ConstantHeatTransfer(alpha=5000),
+        secondary_heat_transfer=heat_transfer.constant.ConstantHeatTransfer(alpha=25)
+    )
+    from vclibpy.components.expansion_valves import Bernoulli
+    expansion_valve = Bernoulli(A=0.1)
+
+    from vclibpy.components.compressors import RotaryCompressor
+    compressor = RotaryCompressor(
+        N_max=125,
+        V_h=19e-6
+    )
+
+    # Now, we can plug everything into the flowsheet:
+    flowsheet = StandardCycleTranscritical(
+        evaporator=evaporator,
+        condenser=condenser,
+        fluid="CO2",
+        compressor=compressor,
+        expansion_valve=expansion_valve,
+    )
+
+    import logging
+    logging.basicConfig(level="INFO")
+
+    from vclibpy.datamodels import Inputs, RelativeCompressorSpeedControl, HeatExchangerInputs
+    from vclibpy.algorithms.iteration import Iteration
+    from vclibpy.utils.plotting import plot_cycle
+
+    save_path = r"D:\00_temp\standard_ejector_cycle"
+    algorithm = Iteration(raise_errors=True, save_path_plots=save_path, show_iteration=True)
+    speed_control = RelativeCompressorSpeedControl(0.2, 0.0, 0)
+    eva_inputs = HeatExchangerInputs(T_in=18 + 273.15, m_flow=1)
+    con_inputs = HeatExchangerInputs(T_in=28 + 273.15, m_flow=1)
+    inputs = Inputs(control=speed_control, evaporator=eva_inputs, condenser=con_inputs)
+
+    p_1_start, p_2_start, p_max, fs_state = algorithm.initial_setup(flowsheet, fluid=None, inputs=inputs)
+
+    # flowsheet.calc_states(1e6, 6e6, inputs, fs_state)
+
+    fs_state = algorithm.calc_steady_state(flowsheet, inputs, "CarbonDioxide")
+    #plot_cycle(flowsheet.med_prop, flowsheet.get_states_in_order_for_plotting(), show=True)
+    print(f"Compressor:")
+    print(f"m_flow = {flowsheet.compressor.m_flow * 3600} kg/h")
+    print(f"state_inlet = {flowsheet.compressor.state_inlet}")
+    print(f"state_outlet = {flowsheet.compressor.state_outlet}")
+    print(f"Condenser:")
+    print(f"m_flow = {flowsheet.condenser.m_flow * 3600} kg/h")
+    print(f"state_inlet = {flowsheet.condenser.state_inlet}")
+    print(f"state_outlet = {flowsheet.condenser.state_outlet}")
+    print(f"Temperature secondary_inlet = {flowsheet.condenser.T_in}")
+    print(f"Temperature secondary_outlet = {flowsheet.condenser.T_out}")
+    print(f"Evaporator:")
+    print(f"m_flow = {flowsheet.evaporator.m_flow * 3600} kg/h")
+    print(f"state_inlet = {flowsheet.evaporator.state_inlet}")
+    print(f"state_outlet = {flowsheet.evaporator.state_outlet}")
+    print(f"COP: {fs_state.get('COP').value}")
+
+
+
+def test_gas_cooler():
+    from vclibpy.components.heat_exchangers import moving_boundary_ntu
+    from vclibpy.components.heat_exchangers import heat_transfer
+    from vclibpy.datamodels import Inputs, HeatExchangerInputs
+    from vclibpy.media.ref_prop import RefProp
+    from vclibpy.datamodels import FlowsheetState
+    import numpy as np
+
+    med_prop = RefProp(fluid_name="CarbonDioxide")
+
+    condenser = moving_boundary_ntu.MovingBoundaryNTUGasCooler(
+        A=15,
+        secondary_medium="air",
+        flow_type="counter",
+        ratio_outer_to_inner_area=10,
+        two_phase_heat_transfer=heat_transfer.constant.ConstantTwoPhaseHeatTransfer(alpha=1000),
+        gas_heat_transfer=heat_transfer.constant.ConstantHeatTransfer(alpha=1000),
+        wall_heat_transfer=heat_transfer.wall.WallTransfer(lambda_=236, thickness=2e-3),
+        liquid_heat_transfer=heat_transfer.constant.ConstantHeatTransfer(alpha=5000),
+        secondary_heat_transfer=heat_transfer.constant.ConstantHeatTransfer(alpha=25)
+    )
+    condenser.med_prop = med_prop
+    condenser.m_flow = 0.02
+    condenser.start_secondary_med_prop()
+
+    condenserInputs = HeatExchangerInputs(T_in=273.15+20, m_flow=0.1)
+    inputs = Inputs(condenser=condenserInputs)
+    fs_state = FlowsheetState()
+
+    condenser.calc_secondary_cp(inputs.condenser.T)
+
+    # p = 12e6
+    # condenser.state_inlet = med_prop.calc_state("PH", p, 494670)
+    # condenser.state_outlet = med_prop.calc_state("PT", p, 273.15+23)
+    #
+    # error, dT_min, q_ntu, q = condenser.calc(inputs=inputs, fs_state=fs_state)
+    # print(f"Error: {error}")
+    # print(f"dT_min: {dT_min}")
+    # print(f"Q_ntu: {q_ntu}")
+    # print(f"Q: {q}")
+    # print(f"Condenser state inlet: {condenser.state_inlet}")
+    # print(f"Condenser state outlet: {condenser.state_outlet}")
+    # print(f"Condenser state inlet secondary: {condenser.T_in}")
+    # print(f"Condenser state outlet secondary: {condenser.T_out}")
+
+
+
+    pressures = np.arange(7.5e6, 17e6, 10000)
+    errors = []
+    Q_ntu = []
+    Q = []
+
+    for p in pressures:
+        condenser.state_inlet = med_prop.calc_state("PH", p, 494670)
+        condenser.state_outlet = med_prop.calc_state("PH", p, 289520)
+        error, dT_min, q_ntu, q = condenser.calc(inputs=inputs, fs_state=fs_state)
+        errors.append(error)
+        Q_ntu.append(q_ntu)
+        Q.append(q)
+
+    # Plotting the results
+    import matplotlib.pyplot as plt
+
+    fig, ax1 = plt.subplots()
+
+    # Plot errors on the primary y-axis
+    ax1.plot(pressures / 1e5, errors, 'b-', label='Error')
+    ax1.set_xlabel('Pressure (bar)')
+    ax1.set_ylabel('Error', color='b')
+    ax1.tick_params(axis='y', labelcolor='b')
+
+    # Create a secondary y-axis for Q_ntu and Q
+    ax2 = ax1.twinx()
+    ax2.plot(pressures / 1e5, Q_ntu, 'r--', label='Q_ntu')
+    ax2.plot(pressures / 1e5, Q, 'g-.', label='Q')
+    ax2.set_ylabel('Heat Transfer (Q)', color='r')
+    ax2.tick_params(axis='y', labelcolor='r')
+
+    # Add legends
+    fig.legend(loc="upper right", bbox_to_anchor=(1, 1), bbox_transform=ax1.transAxes)
+
+    # Add grid and title
+    plt.title('Error and Heat Transfer vs Pressure')
+    plt.grid()
+    plt.show()
+
+
+
+
+def test_condenser():
+    from vclibpy.components.heat_exchangers import moving_boundary_ntu
+    from vclibpy.components.heat_exchangers import heat_transfer
+    from vclibpy.datamodels import Inputs, HeatExchangerInputs
+    from vclibpy.media.ref_prop import RefProp
+    from vclibpy.datamodels import FlowsheetState
+    import numpy as np
+
+    med_prop = RefProp(fluid_name="CarbonDioxide")
+
+    condenser = moving_boundary_ntu.MovingBoundaryNTUCondenser(
+        A=80,
+        secondary_medium="air",
+        flow_type="counter",
+        ratio_outer_to_inner_area=10,
+        two_phase_heat_transfer=heat_transfer.constant.ConstantTwoPhaseHeatTransfer(alpha=1000),
+        gas_heat_transfer=heat_transfer.constant.ConstantHeatTransfer(alpha=1000),
+        wall_heat_transfer=heat_transfer.wall.WallTransfer(lambda_=236, thickness=2e-3),
+        liquid_heat_transfer=heat_transfer.constant.ConstantHeatTransfer(alpha=5000),
+        secondary_heat_transfer=heat_transfer.constant.ConstantHeatTransfer(alpha=25)
+    )
+    condenser.med_prop = med_prop
+    condenser.m_flow = 0.01
+    condenser.start_secondary_med_prop()
+
+    condenserInputs = HeatExchangerInputs(T_in=273.15-50, m_flow=0.2)
+    inputs = Inputs(condenser=condenserInputs)
+    fs_state = FlowsheetState()
+
+    condenser.calc_secondary_cp(inputs.condenser.T)
+
+    pressures = np.arange(8e5, 7e6, 10000)
+    errors = []
+    dT_minimum = []
+    Q_ntu = []
+    Q = []
+    Q_sc_ntu = []
+    Q_lat_ntu = []
+    Q_sh_ntu = []
+
+    for p in pressures:
+        condenser.state_inlet = med_prop.calc_state("PH", p, 454670)
+        condenser.state_outlet = med_prop.calc_state("PH", p, 189520)
+        error, dT_min, q_ntu, q, q_sc_ntu, q_lat_ntu, q_sh_ntu = condenser.calc(inputs=inputs, fs_state=fs_state)
+        errors.append(error)
+        dT_minimum.append(dT_min)
+        Q_ntu.append(q_ntu)
+        Q.append(q)
+        Q_sc_ntu.append(q_sc_ntu)
+        Q_lat_ntu.append(q_lat_ntu)
+        Q_sh_ntu.append(q_sh_ntu)
+
+
+    # Plotting the results
+    import matplotlib.pyplot as plt
+
+    fig, ax1 = plt.subplots()
+
+    # Plot errors on the primary y-axis
+    ax1.plot(pressures / 1e5, errors, 'b-', label='Error')
+    ax1.set_xlabel('Pressure (bar)')
+    ax1.set_ylabel('Error', color='b')
+    ax1.tick_params(axis='y', labelcolor='b')
+
+    # Create a secondary y-axis for Q_ntu and Q
+    ax2 = ax1.twinx()
+    ax2.plot(pressures / 1e5, Q_ntu, 'r--', label='Q_ntu')
+    ax2.plot(pressures / 1e5, Q, 'g-.', label='Q')
+    ax2.plot(pressures / 1e5, Q_sc_ntu, 'm:', label='Q_sc_ntu')
+    ax2.plot(pressures / 1e5, Q_lat_ntu, 'c:', label='Q_lat_ntu')
+    ax2.plot(pressures / 1e5, Q_sh_ntu, 'y:', label='Q_sh_ntu')
+    ax2.set_ylabel('Heat Transfer (Q)', color='r')
+    ax2.tick_params(axis='y', labelcolor='r')
+
+    ax3 = ax1.twinx()
+    ax3.plot(pressures / 1e5, dT_minimum, 'k--', label='dT_min')
+    ax3.set_ylabel('dT_min', color='k')
+    ax3.tick_params(axis='y', labelcolor='k')
+
+
+    # Add legends
+    fig.legend(loc="upper right", bbox_to_anchor=(1, 1), bbox_transform=ax1.transAxes)
+
+    # Add grid and title
+    plt.title('Error and Heat Transfer vs Pressure')
+    plt.grid()
+    plt.show()
+
 
 if __name__ == "__main__":
-    main(use_condenser_inlet=False)
+    # test_gas_cooler()
+    # test_condenser()
+    # main(use_condenser_inlet=True)
+    calculate_single_point()
