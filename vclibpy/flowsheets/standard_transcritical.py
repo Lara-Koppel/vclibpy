@@ -2,6 +2,7 @@ from vclibpy.flowsheets import BaseCycle
 from vclibpy.datamodels import FlowsheetState, Inputs
 from vclibpy.components.compressors import Compressor
 from vclibpy.components.expansion_valves import ExpansionValve
+import numpy
 
 
 class StandardCycleTranscritical(BaseCycle):
@@ -35,24 +36,49 @@ class StandardCycleTranscritical(BaseCycle):
         ]
 
     def get_states_in_order_for_plotting(self):
-        return [
+        states = [
             self.evaporator.state_inlet,
             self.med_prop.calc_state("PQ", self.evaporator.state_inlet.p, 1),
-            self.evaporator.state_outlet,
             self.compressor.state_inlet,
-            self.compressor.state_outlet,
-            self.condenser.state_inlet,
-            self.med_prop.calc_state("PQ", self.condenser.state_inlet.p, 1),
-            self.med_prop.calc_state("PQ", self.condenser.state_inlet.p, 0),
-            self.condenser.state_outlet,
-            self.expansion_valve.state_inlet,
-            self.expansion_valve.state_outlet,
         ]
+
+        # Interpolate the states between the condenser inlet and outlet
+        p = self.condenser.state_inlet.p
+        h_in = self.condenser.state_inlet.h
+        h_out = self.condenser.state_outlet.h
+        h_steps = numpy.linspace(h_in, h_out, 20)
+
+        for h_val in h_steps:
+            inter_state = self.med_prop.calc_state("PH", p, h_val)
+            states.append(inter_state)
+
+        states.append(self.expansion_valve.state_inlet)
+        states.append(self.expansion_valve.state_outlet)
+        return states
 
     def set_condenser_outlet_based_on_q(self, p_con: float, inputs: Inputs, q_4, p_eva: float):
         h_4 = self.med_prop.calc_state("PQ", p_eva, q_4).h
         self.condenser.state_outlet = self.med_prop.calc_state("PH", p_con, h_4)
         #print(self.condenser.state_outlet)
+
+    def set_condenser_outlet_based_on_pinch_point(self, p_2, inputs, pinch_point=3):
+        """
+        Set the condenser outlet based on the pinch point.
+        For maximal efficiency, the pinch point in a gas cooler should be at the gas cooler outlet.
+
+        Args:
+            p_2 (float): Gas cooler pressure in Pa.
+            inputs (Inputs): Inputs object containing the condenser information.
+            pinch_point (float): Pinch point in K. Default is 2 K.
+        """
+        if inputs.condenser.uses_inlet:
+            T_in = inputs.condenser.T_in
+        else:
+            raise NotImplementedError("Secondary condenser outlet temperature calculation not implemented yet. "
+                                      "Condenser inlet temperature for secondary side needs to be provided.")
+        return self.med_prop.calc_state("PT", p_2, T_in + pinch_point)
+
+
 
     def calc_states(self, p_1, p_2, inputs: Inputs, fs_state: FlowsheetState):
         """
@@ -69,42 +95,94 @@ class StandardCycleTranscritical(BaseCycle):
         """
 
 
-        last_cop = 1
-        q_4_step = 0.1
-        q_4 = 0.15
+        # last_cop = 1
+        # q_4_step = 0.1
+        # q_4 = 0.15
+        #
+        # while q_4_step > 0.0001:
+        #     self.set_condenser_outlet_based_on_q(p_con=p_2, inputs=inputs, q_4=q_4, p_eva=p_1)
+        #     self.expansion_valve.state_inlet = self.condenser.state_outlet
+        #     self.expansion_valve.calc_outlet(p_outlet=p_1)
+        #     self.evaporator.state_inlet = self.expansion_valve.state_outlet
+        #     self.set_evaporator_outlet_based_on_superheating(p_eva=p_1, inputs=inputs)
+        #     self.compressor.state_inlet = self.evaporator.state_outlet
+        #     self.compressor.calc_state_outlet(p_outlet=p_2, inputs=inputs, fs_state=fs_state)
+        #     self.condenser.state_inlet = self.compressor.state_outlet
+        #     # Mass flow rate:
+        #     self.compressor.calc_m_flow(inputs=inputs, fs_state=fs_state)
+        #     self.condenser.m_flow = self.compressor.m_flow
+        #     self.evaporator.m_flow = self.compressor.m_flow
+        #     self.expansion_valve.m_flow = self.compressor.m_flow
+        #     Q_con = self.condenser.calc_Q_flow()
+        #     P_el = self.calc_electrical_power(fs_state=fs_state, inputs=inputs)
+        #     current_cop = Q_con / P_el
+        #     print(f"COP: {current_cop}; q_4: {q_4}")
+        #     if current_cop < last_cop:
+        #         q_4 += q_4_step
+        #         q_4_step /= 10
+        #         q_4 -= q_4_step
+        #         if 0 > q_4 or q_4 > 1:
+        #             q_4 += q_4_step
+        #             q_4_step /= 10
+        #     else:
+        #         q_4 -= q_4_step
+        #         if 0 > q_4 or q_4 > 1:
+        #             q_4 += q_4_step
+        #             q_4_step /= 10
+        #     #print("q_4: ", q_4)
+        #     last_cop = current_cop
 
-        while q_4_step > 0.0001:
-            self.set_condenser_outlet_based_on_q(p_con=p_2, inputs=inputs, q_4=q_4, p_eva=p_1)
-            self.expansion_valve.state_inlet = self.condenser.state_outlet
-            self.expansion_valve.calc_outlet(p_outlet=p_1)
-            self.evaporator.state_inlet = self.expansion_valve.state_outlet
-            self.set_evaporator_outlet_based_on_superheating(p_eva=p_1, inputs=inputs)
-            self.compressor.state_inlet = self.evaporator.state_outlet
-            self.compressor.calc_state_outlet(p_outlet=p_2, inputs=inputs, fs_state=fs_state)
-            self.condenser.state_inlet = self.compressor.state_outlet
-            # Mass flow rate:
-            self.compressor.calc_m_flow(inputs=inputs, fs_state=fs_state)
-            self.condenser.m_flow = self.compressor.m_flow
-            self.evaporator.m_flow = self.compressor.m_flow
-            self.expansion_valve.m_flow = self.compressor.m_flow
-            Q_con = self.condenser.calc_Q_flow()
-            P_el = self.calc_electrical_power(fs_state=fs_state, inputs=inputs)
-            current_cop = Q_con / P_el
-            #print("COP: ", current_cop)
-            if current_cop < last_cop:
-                q_4 += q_4_step
-                q_4_step /= 10
-                q_4 -= q_4_step
-                if 0 > q_4 or q_4 > 1:
-                    q_4 += q_4_step
-                    q_4_step /= 10
+        self.set_evaporator_outlet_based_on_superheating(p_eva=p_1, inputs=inputs)
+        self.compressor.state_inlet = self.evaporator.state_outlet
+        self.compressor.calc_state_outlet(p_outlet=p_2, inputs=inputs, fs_state=fs_state)
+        self.condenser.state_inlet = self.compressor.state_outlet
+
+        # Mass flow rates:
+        self.compressor.calc_m_flow(inputs=inputs, fs_state=fs_state)
+        self.condenser.m_flow = self.compressor.m_flow
+        self.evaporator.m_flow = self.compressor.m_flow
+        self.expansion_valve.m_flow = self.compressor.m_flow
+
+        # iterate the condenser outlet temperature based on energy balance
+        max_err_q = 0.5
+        error_history = []
+        step_pinch_point = 1
+        min_step_pinch_point = 0.001
+        pinch_point = 3    # Starting pinch point in K
+        self.condenser.state_outlet = self.set_condenser_outlet_based_on_pinch_point(p_2=p_2, inputs=inputs, pinch_point=pinch_point)
+        # First iteration outside while loop to get the first error
+        error, dT_min = self.condenser.calc(inputs=inputs, fs_state=fs_state)
+        error_history.append(error)
+        #print(f"Error: {error}, T_con_out: {self.condenser.state_outlet.T}")
+        if error > 0:
+            pinch_point -= step_pinch_point
+        else:
+            pinch_point += step_pinch_point
+        self.condenser.state_outlet = self.set_condenser_outlet_based_on_pinch_point(p_2=p_2, inputs=inputs,
+                                                                                     pinch_point=pinch_point)
+        #print(f"Error: {error}, T_con_out: {self.condenser.state_outlet.T}")
+        while True:
+            error, dT_min = self.condenser.calc(inputs=inputs, fs_state=fs_state)
+            error_history.append(error)
+            #print(f"Error: {error}, T_con_out: {self.condenser.state_outlet.T}")
+
+            if numpy.sign(error_history[-1]) != numpy.sign(error_history[-2]):
+                step_pinch_point /= 10
+
+            if abs(error) > max_err_q or step_pinch_point > min_step_pinch_point:
+                if error > 0:
+                    pinch_point -= step_pinch_point
+                else:
+                    pinch_point += step_pinch_point
+                self.condenser.state_outlet = self.set_condenser_outlet_based_on_pinch_point(p_2=p_2, inputs=inputs, pinch_point=pinch_point)
             else:
-                q_4 -= q_4_step
-                if 0 > q_4 or q_4 > 1:
-                    q_4 += q_4_step
-                    q_4_step /= 10
-            #print("q_4: ", q_4)
-            last_cop = current_cop
+                break
+
+        self.expansion_valve.state_inlet = self.condenser.state_outlet
+        self.expansion_valve.calc_outlet(p_outlet=p_1)
+        self.evaporator.state_inlet = self.expansion_valve.state_outlet
+        # print(self.condenser.state_outlet)
+        # print(error)
 
         fs_state.set(
             name="y_EV", value=self.expansion_valve.calc_opening_at_m_flow(m_flow=self.expansion_valve.m_flow),
@@ -128,6 +206,7 @@ class StandardCycleTranscritical(BaseCycle):
         )
         fs_state.set(name="p_con", value=p_2, unit="Pa", description="Condensation pressure")
         fs_state.set(name="p_eva", value=p_1, unit="Pa", description="Evaporation pressure")
+        #print("converged")
 
     def calc_electrical_power(self, inputs: Inputs, fs_state: FlowsheetState):
         """Based on simple energy balance - Adiabatic"""
