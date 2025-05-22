@@ -104,6 +104,22 @@ def get_condenser_phase_temperatures_and_alpha(
         T_in = T_sc - heat_exchanger.calc_secondary_Q_flow(Q_sc) / cp
     return T_in, T_sc, T_sh, T_out
 
+def get_gas_cooler_phase_temperatures(
+        inputs: Inputs,
+        Q: float,
+        heat_exchanger: HeatExchanger
+):
+    cp = heat_exchanger.m_flow_secondary_cp
+    # Calculate secondary_medium side temperatures:
+    # Assumption loss is the same correlation for each regime
+    if inputs.condenser.uses_inlet:
+        T_in = inputs.condenser.T_in
+        T_out = T_in + Q / cp
+    else:
+        T_out = inputs.condenser.T_out
+        T_in = T_out - Q / cp
+    return T_in, T_out
+
 
 def plot_lmtd_vs_cold_out(T_hot_in, T_hot_out, dT_cold):
     """
