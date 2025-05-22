@@ -4,7 +4,9 @@ import numpy as np
 
 from vclibpy.datamodels import FlowsheetState, Inputs
 from vclibpy.components.heat_exchangers import ntu, ExternalHeatExchanger
-from vclibpy.components.heat_exchangers.utils import separate_phases, get_condenser_phase_temperatures_and_alpha
+from vclibpy.components.heat_exchangers.utils import (separate_phases,
+                                                      get_condenser_phase_temperatures_and_alpha,
+                                                      get_gas_cooler_phase_temperatures)
 
 logger = logging.getLogger(__name__)
 
@@ -178,34 +180,70 @@ class MovingBoundaryNTUGasCooler(ExternalHeatExchanger):
         self.m_flow_secondary = inputs.condenser.m_flow  # [kg/s]
 
         Q = (self.state_inlet.h - self.state_outlet.h) * self.m_flow
-        T_in = self.state_inlet.T
-        T_out = self.state_outlet.T
+        # Get secondary medium inlet and outlet temperatures
+        T_in, T_out = get_gas_cooler_phase_temperatures(
+            inputs=inputs,
+            Q=Q,
+            heat_exchanger=self
+        )
+        self.T_in = T_in
+        self.T_out = T_out
 
         tra_prop_med = self.calc_transport_properties_secondary_medium((T_in + T_out) / 2)
         alpha_med_wall = self.calc_alpha_secondary(tra_prop_med)
 
-        primary_cp = ((self.state_inlet.h - self.state_outlet.h) / (self.state_inlet.T - self.state_outlet.T))
+        steps = 20
+        h_steps = np.linspace(self.state_inlet.h, self.state_outlet.h, steps+1)
+        inter_states = [self.med_prop.calc_state("PH", self.state_inlet.p, h_val) for h_val in h_steps]
+        Q_ntu, A_used = 0, 0
+        for i in range(steps-1):
+            primary_cp = ((inter_states[i].h - inter_states[i+1].h) / (inter_states[i].T - inter_states[i+1].T))
+            # Get transport properties:
+            tra_prop_ref_con = self.med_prop.calc_mean_transport_properties(inter_states[i], inter_states[i+1])
+            alpha_ref_wall = self.calc_alpha_liquid(tra_prop_ref_con)
+
+            # Only use still available area:
+            k = self.calc_k(alpha_pri=alpha_ref_wall, alpha_sec=alpha_med_wall)
+            Q_ntu_step, A_used_step = ntu.calc_Q_with_available_area(
+                heat_exchanger=self,
+                m_flow_primary_cp=self.m_flow * primary_cp,
+                m_flow_secondary_cp=self.m_flow_secondary_cp,
+                Q_required=Q/steps,
+                k=k,
+                dT_max=(inter_states[i].T - (T_in+(T_out-T_in)/steps*(steps-(i+1)))),
+                A_available=self.A-A_used
+            )
+            A_used += A_used_step
+            Q_ntu += Q_ntu_step
+            # print(f"A_used: {A_used}, Q_ntu: {Q_ntu}, dT_max: {inter_states[i].T - (T_in+((T_out-T_in)/steps)*(steps-(i+1)))}, Q_required: {Q/steps}, A_used_step: {A_used_step}, Q_ntu_step: {Q_ntu_step}")
+
+        primary_cp = ((inter_states[steps-1].h - inter_states[steps].h) / (inter_states[steps-1].T - inter_states[steps].T))
         # Get transport properties:
-        tra_prop_ref_con = self.med_prop.calc_mean_transport_properties(self.state_inlet, self.state_outlet)
+        tra_prop_ref_con = self.med_prop.calc_mean_transport_properties(inter_states[steps-1], inter_states[steps])
         alpha_ref_wall = self.calc_alpha_liquid(tra_prop_ref_con)
 
         # Only use still available area:
         k = self.calc_k(alpha_pri=alpha_ref_wall, alpha_sec=alpha_med_wall)
-        Q_ntu, A = ntu.calc_Q_with_available_area(
-            heat_exchanger=self,
-            k=k,
-            Q_required=Q,
-            A_available=self.A,
-            dT_max=(T_in-T_out),
-            m_flow_secondary_cp=self.m_flow_secondary_cp,
+        Q_ntu_step = ntu.calc_Q_ntu(
             m_flow_primary_cp=self.m_flow * primary_cp,
+            m_flow_secondary_cp=self.m_flow_secondary_cp,
+            k=k,
+            dT_max=(inter_states[steps-1].T - T_in),
+            A=self.A-A_used,
+            flow_type=self.flow_type
         )
+        A_used = self.A
+        Q_ntu += Q_ntu_step
+        # print(f"A_used: {A_used}, Q_ntu: {Q_ntu}, dT_max: {inter_states[i].T - (T_in + ((T_out - T_in) / steps) * (steps - (i + 1)))}, Q_required: {Q / steps}, Q_ntu_step: {Q_ntu_step}")
+
+
         error = (Q_ntu / Q - 1) * 100
         # Get dT_min
         dT_min_in = self.state_outlet.T - T_in
-        dT_min_out = self.state_inlet.T - T_out
+        dT_min_out = self.state_inlet.T - T_out    #ToDO: dT_min can also be in the middle of the gas cooler (where dT/dh_secondary*m_flow_secondary = dT/dh_primary*m_flow_primary)
+        cp_secondary = tra_prop_med.cp
 
-        return error, min(dT_min_out, dT_min_in)
+        return error, min(dT_min_out, dT_min_in)#, Q_ntu, Q
 
 class MovingBoundaryNTUEvaporator(ExternalHeatExchanger):
     """
