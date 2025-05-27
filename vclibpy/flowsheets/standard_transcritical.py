@@ -19,6 +19,16 @@ class StandardCycleTranscritical(BaseCycle):
 
     flowsheet_name = "StandardTranscritical"
 
+    #We first define the constructor for the StandardCycleTranscritical class, which expects a Compressor and an Expansion valve
+    #We also pass any additional keyword arguments to the parent class constructor. That is done throuhg the **kwargs, which stands for keyword arguments.
+    #The "self, compressor: Compressor, expansion_valve: ExpansionValve, **kwargs" in the brackets means that the constructor expects
+    #a Compressor object and an ExpansionValve object, along with any other keyword arguments that might be passed.
+    #Afterwards we call the parent class constructor with super().__init__(**kwargs). So every argument in the base class will also be
+    #passed to the StandardCycleTranscritical class. See in BaseCycle: there we define the fluid as a string, the evaporator and condenser.
+    #self.compressor and self.expansion_valve make sure, we can set the compressor and expansion valve as attributes of the StandardCycleTranscritical class.
+    #so that we can code sth. like flowsheet = StandardCycleTranscritical(compressor=my_compressor, expansion_valve=my_expansion_valve)
+    #otherwise we would not be able to access the compressor and expansion valve in the flowsheet object. Same for the parent class constructor
+
     def __init__(
             self,
             compressor: Compressor,
@@ -29,12 +39,22 @@ class StandardCycleTranscritical(BaseCycle):
         self.compressor = compressor
         self.expansion_valve = expansion_valve
 
+    # Nice to know: get_all_components is a called a method, because it is a function that is defined inside a class
+    # get_all_components also exists in the BaseCycle class. Therefore we call the parent function "get_all_components" with super().get_all_components()
+    # After that we add the compressor and expansion valve to the list of components.
+    # At the end, we should have a list of all components (excluding the fluid for example),
+    # and it should look like this: [my_condenser, my_evaporator, my_compressor, my_expansion_valve]
+
     def get_all_components(self):
         return super().get_all_components() + [
             self.compressor,
             self.expansion_valve
         ]
 
+
+    # In this function, all the states of the cycle are defined. Compared to the old subcritical cycle
+    # we don't have a constant temperature in the two-phase region. Before it was only a return function
+    # now it is a given state list.
     def get_states_in_order_for_plotting(self):
         states = [
             self.evaporator.state_inlet,
@@ -42,6 +62,9 @@ class StandardCycleTranscritical(BaseCycle):
             self.compressor.state_inlet,
         ]
 
+        # Compared to the subcritical flowsheet, we cannot calculate the inlet and outlet state of the condenser/gas cooler
+        # through the quality of the vapor, due to the supercritical state inside the gas cooler
+        # Therefore the gas cooler is split into 20 segments and ???????????
         # Interpolate the states between the condenser inlet and outlet
         p = self.condenser.state_inlet.p
         h_in = self.condenser.state_inlet.h
