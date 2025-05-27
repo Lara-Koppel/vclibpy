@@ -64,12 +64,14 @@ class StandardCycleTranscritical(BaseCycle):
 
         # Compared to the subcritical flowsheet, we cannot calculate the inlet and outlet state of the condenser/gas cooler
         # through the quality of the vapor, due to the supercritical state inside the gas cooler
-        # Therefore the gas cooler is split into 20 segments and ???????????
+        # Therefore the gas cooler is split into 20 segments and 
         # Interpolate the states between the condenser inlet and outlet
         p = self.condenser.state_inlet.p
         h_in = self.condenser.state_inlet.h
         h_out = self.condenser.state_outlet.h
         h_steps = numpy.linspace(h_in, h_out, 20)
+
+
 
         for h_val in h_steps:
             inter_state = self.med_prop.calc_state("PH", p, h_val)
