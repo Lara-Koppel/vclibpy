@@ -1,17 +1,19 @@
 # # Example for a heat pump with a standard cycle
 
+import os
+
 def main(use_condenser_inlet: bool = True):
     # Let's start the complete cycle simulation with the
     # most basic flowsheet, the standard-cycle. As all flowsheets
-    # contain a condenser and an evaporator, we defined a common BaseCycle
+    # contain a condenser/gas cooler and an evaporator, we defined a common BaseCycle
     # to avoid code-repetition.
     # We can import this flowsheet and see how to use it. Note that
     # modern coding IDEs like PyCharm will tell you which arguments belong
     # to a class or function. If you don't have that at hand, you need
     # to look into the documentation.
     from vclibpy.flowsheets import BaseCycle, StandardCycleTranscritical
-    help(BaseCycle)
-    help(StandardCycleTranscritical)
+    #help(BaseCycle)
+    #help(StandardCycleTranscritical)
 
     # We fist need to define the components in the cycle.
     # Here we are using the components developed in the previous examples.
@@ -152,6 +154,7 @@ def calculate_single_point():
         liquid_heat_transfer=heat_transfer.constant.ConstantHeatTransfer(alpha=5000),
         secondary_heat_transfer=heat_transfer.constant.ConstantHeatTransfer(alpha=25)
     )
+
     from vclibpy.components.expansion_valves import Bernoulli
     expansion_valve = Bernoulli(A=0.1)
 
@@ -177,7 +180,11 @@ def calculate_single_point():
     from vclibpy.algorithms.iteration import Iteration
     from vclibpy.utils.plotting import plot_cycle
 
-    save_path = r"D:\00_temp\standard_ejector_cycle"
+    save_path = r"D:\00_temp\standard_transcritical_cycle"
+    if not os.path.exists(save_path):
+        os.makedirs(save_path)
+        print(f"Info: Save path {save_path} created.")
+
     algorithm = Iteration(raise_errors=True, save_path_plots=save_path, show_iteration=True)
     speed_control = RelativeCompressorSpeedControl(0.2, 0.0, 0)
     eva_inputs = HeatExchangerInputs(T_in=18 + 273.15, m_flow=1)
