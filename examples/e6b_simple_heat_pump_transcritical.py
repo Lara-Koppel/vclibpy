@@ -1,5 +1,7 @@
 # # Example for a heat pump with a standard cycle
 
+import os
+
 def main(use_condenser_inlet: bool = True):
     # Let's start the complete cycle simulation with the
     # most basic flowsheet, the standard-cycle. As all flowsheets
@@ -66,6 +68,9 @@ def main(use_condenser_inlet: bool = True):
     # Note that T_con can either be inlet or outlet, depending on the setting
     # of `use_condenser_inlet`. Per default, we simulate the inlet, T_con_in
     save_path = r"D:\00_temp\simple_heat_pump"
+    if not os.path.exists(save_path):
+        os.makedirs(save_path)
+        print(f"Info: Save path {save_path} has been created.")
     T_eva_in_ar = [-10 + 273.15, 0 + 273.15, 10 + 273.15]
     T_con_ar = [30 + 273.15, 50 + 273.15, 70 + 273.15]
     n_ar = [0.3, 0.7, 1]
@@ -181,12 +186,15 @@ def calculate_single_point():
     from vclibpy.utils.plotting import plot_cycle
 
     save_path = r"D:\00_temp\standard_transcritical_cycle"
+    if not os.path.exists(save_path):
+        os.makedirs(save_path)
+        print(f"Info: Save path {save_path} has been created.")
     algorithm = Iteration(raise_errors=True, save_path_plots=save_path, show_iteration=True)
     speed_control = RelativeCompressorSpeedControl(0.2, 5.0, 0)
     eva_inputs = HeatExchangerInputs(T_in=18 + 273.15, m_flow=1)
     con_inputs = HeatExchangerInputs(T_in=28 + 273.15, m_flow=1)
     inputs = Inputs(control=speed_control, evaporator=eva_inputs, condenser=con_inputs)
-    print(f"DEBUG: Overheating: {inputs.control.dT_eva_superheating}")
+    # print(f"DEBUG: Overheating: {inputs.control.dT_eva_superheating}")
 
     p_1_start, p_2_start, p_max, fs_state = algorithm.initial_setup(flowsheet, fluid=None, inputs=inputs)
 
