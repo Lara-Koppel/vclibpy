@@ -67,7 +67,7 @@ def main(use_condenser_inlet: bool = True):
     # solver settings and inputs to vary:
     # Note that T_con can either be inlet or outlet, depending on the setting
     # of `use_condenser_inlet`. Per default, we simulate the inlet, T_con_in
-    save_path = r"D:\00_temp\simple_heat_pump"
+    save_path = r"D:\00_temp\Standard_Cycle_Transcritical_FFMG"
     if not os.path.exists(save_path):
         os.makedirs(save_path)
         print(f"Info: Save path {save_path} has been created.")
@@ -90,7 +90,7 @@ def main(use_condenser_inlet: bool = True):
         T_eva_in=T_eva_in_ar,
         n=n_ar,
         use_condenser_inlet=use_condenser_inlet,
-        use_multiprocessing=False,
+        use_multiprocessing=True,
         save_plots=True,
         m_flow_con=1,
         m_flow_eva=1,
@@ -100,12 +100,17 @@ def main(use_condenser_inlet: bool = True):
     )
     # What did just happen? We can analyze all results by listing the
     # files in the save-path - or just open it in our default system explorer.
-    import os
+
     print(os.listdir(save_path))
     # One file should be: `Standard_Propane.csv`. We can load this file and plot
     # the values using e.g. pandas. It is also the second return value of the function.
     import pandas as pd
-    df = pd.read_csv(save_path_csv, index_col=0)
+    df = pd.read_csv(
+        save_path_csv,
+        index_col=0,
+        sep=";",
+        decimal=","
+    )
     df
     # Now, we can plot variables, for example as a scatter plot using matplotlib.
     # You have to know the names, which are the column headers.
@@ -185,7 +190,7 @@ def calculate_single_point():
     from vclibpy.algorithms.iteration import Iteration
     from vclibpy.utils.plotting import plot_cycle
 
-    save_path = r"D:\00_temp\standard_transcritical_cycle"
+    save_path = r"D:\00_temp\Standard_Cycle_Transcritical_Single_Point"
     if not os.path.exists(save_path):
         os.makedirs(save_path)
         print(f"Info: Save path {save_path} has been created.")
