@@ -284,7 +284,9 @@ def full_factorial_map_generation(
     save_path_sdf = save_path.joinpath(f"{flowsheet.flowsheet_name}_{flowsheet.fluid}.sdf")
     save_path_csv = save_path.joinpath(f"{flowsheet.flowsheet_name}_{flowsheet.fluid}.csv")
     pd.DataFrame(variables_to_excel).to_csv(
-        save_path_csv, sep=","
+        save_path_csv,
+        sep=";",
+        decimal=","
     )
 
     # Terminate heat pump med-props:
