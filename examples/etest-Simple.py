@@ -1,5 +1,3 @@
-# # Example for a heat pump with a standard cycle
-
 def main(use_condenser_inlet: bool = True):
     # Let's start the complete cycle simulation with the
     # most basic flowsheet, the standard-cycle. As all flowsheets
@@ -10,8 +8,8 @@ def main(use_condenser_inlet: bool = True):
     # to a class or function. If you don't have that at hand, you need
     # to look into the documentation.
     from vclibpy.flowsheets import BaseCycle, StandardCycle
-    help(BaseCycle)
-    help(StandardCycle)
+    #help(BaseCycle)
+    #help(StandardCycle)
 
     # We fist need to define the components in the cycle.
     # Here we are using the components developed in the previous examples.
@@ -21,20 +19,20 @@ def main(use_condenser_inlet: bool = True):
     from vclibpy.components.heat_exchangers import moving_boundary_ntu
     from vclibpy.components.heat_exchangers import heat_transfer
     condenser = moving_boundary_ntu.MovingBoundaryNTUCondenser(
-        A=5,
-        secondary_medium="water",
-        flow_type="counter",
-        ratio_outer_to_inner_area=1,
-        two_phase_heat_transfer=heat_transfer.constant.ConstantTwoPhaseHeatTransfer(alpha=5000),
-        gas_heat_transfer=heat_transfer.constant.ConstantHeatTransfer(alpha=5000),
+        A=100,
+        secondary_medium="air",
+        flow_type="cross",
+        ratio_outer_to_inner_area=10,
+        two_phase_heat_transfer=heat_transfer.constant.ConstantTwoPhaseHeatTransfer(alpha=1000),
+        gas_heat_transfer=heat_transfer.constant.ConstantHeatTransfer(alpha=1000),
         wall_heat_transfer=heat_transfer.wall.WallTransfer(lambda_=236, thickness=2e-3),
         liquid_heat_transfer=heat_transfer.constant.ConstantHeatTransfer(alpha=5000),
-        secondary_heat_transfer=heat_transfer.constant.ConstantHeatTransfer(alpha=5000)
+        secondary_heat_transfer=heat_transfer.constant.ConstantHeatTransfer(alpha=25)
     )
     evaporator = moving_boundary_ntu.MovingBoundaryNTUEvaporator(
-        A=15,
+        A=100,
         secondary_medium="air",
-        flow_type="counter",
+        flow_type="cross",
         ratio_outer_to_inner_area=10,
         two_phase_heat_transfer=heat_transfer.constant.ConstantTwoPhaseHeatTransfer(alpha=1000),
         gas_heat_transfer=heat_transfer.constant.ConstantHeatTransfer(alpha=1000),
@@ -63,10 +61,10 @@ def main(use_condenser_inlet: bool = True):
     # solver settings and inputs to vary:
     # Note that T_con can either be inlet or outlet, depending on the setting
     # of `use_condenser_inlet`. Per default, we simulate the inlet, T_con_in
-    save_path = r"C:\Users\Lara\PycharmProjects\vclibpy\test"
-    T_eva_in = [-10 + 273.15, 273.15, 10 + 273.15]
-    T_con = [30 + 273.15, 50 + 273.15, 70 + 273.15]
-    n = [0.3, 0.7, 1]
+    save_path = r"C:\Users\Lara\PycharmProjects\vclibpy\testSimple9"
+    T_eva_in = [26 + 273.15]
+    T_con = [28 + 273.15]
+    n = [0.7, 1]
 
     # Now, we can generate the full-factorial performance map
     # using all inputs. The results will be stored under the
@@ -82,11 +80,11 @@ def main(use_condenser_inlet: bool = True):
         T_con=T_con,
         T_eva_in=T_eva_in,
         n=n,
-        use_condenser_inlet=use_condenser_inlet,
+        use_condenser_inlet=True,
         use_multiprocessing=False,
         save_plots=True,
-        m_flow_con=[0.2],
-        m_flow_eva=[0.9],
+        m_flow_con=[1],
+        m_flow_eva=[1],
         dT_eva_superheating=[5],
         dT_con_subcooling=[0],
     )
@@ -98,31 +96,31 @@ def main(use_condenser_inlet: bool = True):
     # the values using e.g. pandas. It is also the second return value of the function.
     import pandas as pd
     df = pd.read_csv(save_path_csv, index_col=0)
-    df
+   #df
     # Now, we can plot variables, for example as a scatter plot using matplotlib.
     # You have to know the names, which are the column headers.
-    import matplotlib.pyplot as plt
-    x_name = "n"
-    y_name = "COP"
-    plt.scatter(df[x_name], df[y_name], s=20)
-    plt.ylabel(y_name)
-    plt.xlabel(x_name)
-    plt.show()
+   # import matplotlib.pyplot as plt
+   # x_name = "n"
+    #y_name = "COP"
+   # plt.scatter(df[x_name], df[y_name], s=20)
+   # plt.ylabel(y_name)
+   # plt.xlabel(x_name)
+   # plt.show()
     # Looking at the results, we see that a higher frequency often leads to lower COP values.
     # However, other inputs (temperatures) have a greater impact on the COP.
     # We can also use existing 3D-plotting scripts in vclibpy to analyze the
     # dependencies. For this, we need the .sdf file. In the sdf, the field names are without
     # the unit and description, as those are accessible in the file-format in other columns.
     # Depending on whether we varied the inlet or outlet, we have to specify the correct name.
-    from vclibpy.utils.plotting import plot_sdf_map
-    plot_sdf_map(
-        filepath_sdf=save_path_sdf,
-        nd_data="COP",
-        first_dimension="T_eva_in",
-        second_dimension="T_con_in" if use_condenser_inlet else "T_con_out",
-        fluids=["Propane"],
-        flowsheets=["Standard"]
-    )
+   # from vclibpy.utils.plotting import plot_sdf_map
+   # plot_sdf_map(
+    #    filepath_sdf=save_path_sdf,
+    #    nd_data="COP",
+    #   first_dimension="T_eva_in",
+    #    second_dimension="T_con_in" if use_condenser_inlet else "T_con_out",
+    #    fluids=["Propane"],
+     #   flowsheets=["Standard"]
+    #)
 
 
 if __name__ == "__main__":
