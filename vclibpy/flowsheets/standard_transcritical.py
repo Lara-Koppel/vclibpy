@@ -157,13 +157,15 @@ class StandardCycleTranscritical(BaseCycle):
         #     #print("q_4: ", q_4)
         #     last_cop = current_cop
 
-        self.set_evaporator_outlet_based_on_superheating(p_eva=p_1, inputs=inputs)
+        self.set_evaporator_outlet_based_on_superheating(p_eva=p_1, inputs=inputs)              # Calling the function from base.py to set the evaporator outlet based on superheating
         self.compressor.state_inlet = self.evaporator.state_outlet
         self.compressor.calc_state_outlet(p_outlet=p_2, inputs=inputs, fs_state=fs_state)
         self.condenser.state_inlet = self.compressor.state_outlet
 
         # Mass flow rates:
         self.compressor.calc_m_flow(inputs=inputs, fs_state=fs_state)
+        print(f"DEBUG (StandardCycleTranscritical): For Inputs '{inputs.get_name()}'") #NEWLY ADDED
+        print(f"DEBUG: Calculated refrigerant mass flow rate: {self.compressor.m_flow} kg/s") #NEWLY ADDED
         self.condenser.m_flow = self.compressor.m_flow
         self.evaporator.m_flow = self.compressor.m_flow
         self.expansion_valve.m_flow = self.compressor.m_flow
