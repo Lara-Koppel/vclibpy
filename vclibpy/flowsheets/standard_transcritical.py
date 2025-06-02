@@ -179,6 +179,7 @@ class StandardCycleTranscritical(BaseCycle):
         self.evaporator.m_flow = self.compressor.m_flow
         self.expansion_valve.m_flow = self.compressor.m_flow
 
+        '''
         # iterate the condenser outlet temperature based on energy balance
         max_err_q = 0.5
         error_history = []
@@ -213,6 +214,26 @@ class StandardCycleTranscritical(BaseCycle):
                 self.condenser.state_outlet = self.set_condenser_outlet_based_on_pinch_point(p_2=p_2, inputs=inputs, pinch_point=pinch_point)
             else:
                 break
+        '''
+
+        # This is an alternative to the above iteration, which sets a fixed gas cooler outlet temperature
+        # Yet to be determined, whether this code is working
+        fixed_gas_cooler_outlet_temp = 35 + 273.15
+
+        try:
+            self.condenser.state_outlet = self.med_prop.calc_state("PT", p_2, fixed_gas_cooler_outlet_temp)
+            logging.info(f"Set gas cooler outlet temperature to {fixed_gas_cooler_outlet_temp} K at p={p_2/1e5:.2f} bar.")
+        except Exception as e_gc_fixed:
+            logging.error(f"Failed to set fixed gas cooler outlet temperature to: {fixed_gas_cooler_outlet_temp} K")
+            raise e_gc_fixed
+
+        try:
+            error, dT_min = self.condenser.calc(inputs=inputs, fs_state=fs_state)
+            logging.info(f"Calculated condenser error: {error}, dT_min: {dT_min}")
+        except Exception as e_gc_calc:
+            logging.error(f"Failed to calculate condenser state with fixed outlet temperature: {fixed_gas_cooler_outlet_temp} K")
+            raise e_gc_calc
+
 
         self.expansion_valve.state_inlet = self.condenser.state_outlet
         self.expansion_valve.calc_outlet(p_outlet=p_1)
