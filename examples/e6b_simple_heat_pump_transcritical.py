@@ -67,12 +67,12 @@ def main(use_condenser_inlet: bool = True):
     # solver settings and inputs to vary:
     # Note that T_con can either be inlet or outlet, depending on the setting
     # of `use_condenser_inlet`. Per default, we simulate the inlet, T_con_in
-    save_path = r"D:\00_temp\Standard_Cycle_Transcritical_FFMG"
+    save_path = r"D:\00_temp\Standard_TC_FFMG"
     if not os.path.exists(save_path):
         os.makedirs(save_path)
         print(f"Info: Save path {save_path} has been created.")
-    T_eva_in_ar = [-10 + 273.15, 0 + 273.15, 10 + 273.15]
-    T_con_ar = [30 + 273.15, 50 + 273.15, 70 + 273.15]
+    T_eva_in_ar = [15 + 273.15,]
+    T_con_ar = [50 + 273.15]
     n_ar = [0.3, 0.7, 1]
 
     # Now, we can generate the full-factorial performance map
@@ -90,7 +90,7 @@ def main(use_condenser_inlet: bool = True):
         T_eva_in=T_eva_in_ar,
         n=n_ar,
         use_condenser_inlet=use_condenser_inlet,
-        use_multiprocessing=True,
+        use_multiprocessing=False,
         save_plots=True,
         m_flow_con=1,
         m_flow_eva=1,
@@ -190,7 +190,7 @@ def calculate_single_point():
     from vclibpy.algorithms.iteration import Iteration
     from vclibpy.utils.plotting import plot_cycle
 
-    save_path = r"D:\00_temp\Standard_Cycle_Transcritical_Single_Point"
+    save_path = r"D:\00_temp\Standard_TC_SP"
     if not os.path.exists(save_path):
         os.makedirs(save_path)
         print(f"Info: Save path {save_path} has been created.")
@@ -225,5 +225,5 @@ def calculate_single_point():
 
 
 if __name__ == "__main__":
-    # main(use_condenser_inlet=True)
-    calculate_single_point()
+    main(use_condenser_inlet=True)
+    # calculate_single_point()
