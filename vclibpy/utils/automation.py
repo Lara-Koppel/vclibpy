@@ -186,14 +186,14 @@ def full_factorial_map_generation(
         save_path = pathlib.Path(save_path)
 
     timestamp = time.strftime("%Y%m%d_%H%M")
-    run_specific_save_path = save_path.joinpath(f"{flowsheet.flowsheet_name}_{timestamp}")
-    os.makedirs(run_specific_save_path, exist_ok=True)
+    run_specific_path = save_path.joinpath(f"{flowsheet.flowsheet_name}_{timestamp}")
+    os.makedirs(run_specific_path, exist_ok=True)
 
     if algorithm is None:
         algorithm = Iteration()
     if save_plots:
         plot_directory_name = f"plots_{flowsheet.flowsheet_name}_{flowsheet.fluid}"
-        algorithm.save_path_plots = run_specific_save_path.joinpath(plot_directory_name)
+        algorithm.save_path_plots = run_specific_path.joinpath(plot_directory_name)
         os.makedirs(algorithm.save_path_plots, exist_ok=True)
 
     list_mp_inputs = []
@@ -287,8 +287,8 @@ def full_factorial_map_generation(
 
     # Save to excel
     base_filename = f"{flowsheet.flowsheet_name}_{flowsheet.fluid}"
-    save_path_sdf = run_specific_save_path.joinpath(f"{base_filename}.sdf")
-    save_path_csv = run_specific_save_path.joinpath(f"{base_filename}.csv")
+    save_path_sdf = save_path.joinpath(f"{base_filename}.sdf")
+    save_path_csv = save_path.joinpath(f"{base_filename}.csv")
     pd.DataFrame(variables_to_excel).to_csv(
         save_path_csv,
         sep=";",
