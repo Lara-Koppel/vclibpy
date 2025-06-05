@@ -8,6 +8,7 @@ from typing import List, Union
 import multiprocessing
 import numpy as np
 import pandas as pd
+import time
 from vclibpy.datamodels import FlowsheetState, Inputs, RelativeCompressorSpeedControl, HeatExchangerInputs
 from vclibpy.flowsheets import BaseCycle
 from vclibpy.algorithms import Algorithm, Iteration
@@ -183,12 +184,16 @@ def full_factorial_map_generation(
 
     if isinstance(save_path, str):
         save_path = pathlib.Path(save_path)
+
+    timestamp = time.strftime("%Y%m%d_%H%M")
+    run_specific_path = save_path.joinpath(f"{flowsheet.flowsheet_name}_{timestamp}")
+    os.makedirs(run_specific_path, exist_ok=True)
+
     if algorithm is None:
         algorithm = Iteration()
     if save_plots:
-        algorithm.save_path_plots = pathlib.Path(save_path).joinpath(
-            f"plots_{flowsheet.flowsheet_name}_{flowsheet.fluid}"
-        )
+        plot_directory_name = f"plots_{flowsheet.flowsheet_name}_{flowsheet.fluid}"
+        algorithm.save_path_plots = run_specific_path.joinpath(plot_directory_name)
         os.makedirs(algorithm.save_path_plots, exist_ok=True)
 
     list_mp_inputs = []
@@ -281,8 +286,9 @@ def full_factorial_map_generation(
         })
 
     # Save to excel
-    save_path_sdf = save_path.joinpath(f"{flowsheet.flowsheet_name}_{flowsheet.fluid}.sdf")
-    save_path_csv = save_path.joinpath(f"{flowsheet.flowsheet_name}_{flowsheet.fluid}.csv")
+    base_filename = f"{flowsheet.flowsheet_name}_{flowsheet.fluid}"
+    save_path_sdf = save_path.joinpath(f"{base_filename}.sdf")
+    save_path_csv = save_path.joinpath(f"{base_filename}.csv")
     pd.DataFrame(variables_to_excel).to_csv(
         save_path_csv,
         sep=";",
