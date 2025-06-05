@@ -179,7 +179,7 @@ class StandardCycleTranscritical(BaseCycle):
         self.evaporator.m_flow = self.compressor.m_flow
         self.expansion_valve.m_flow = self.compressor.m_flow
 
-        '''
+
         # iterate the condenser outlet temperature based on energy balance
         max_err_q = 0.5
         error_history = []
@@ -197,7 +197,7 @@ class StandardCycleTranscritical(BaseCycle):
             pinch_point += step_pinch_point
         self.condenser.state_outlet = self.set_condenser_outlet_based_on_pinch_point(p_2=p_2, inputs=inputs,
                                                                                      pinch_point=pinch_point)
-        #print(f"Error: {error}, T_con_out: {self.condenser.state_outlet.T}")
+        print(f"Error: {error}, T_con_out: {self.condenser.state_outlet.T}")
         while True:
             error, dT_min = self.condenser.calc(inputs=inputs, fs_state=fs_state)
             error_history.append(error)
@@ -214,10 +214,9 @@ class StandardCycleTranscritical(BaseCycle):
                 self.condenser.state_outlet = self.set_condenser_outlet_based_on_pinch_point(p_2=p_2, inputs=inputs, pinch_point=pinch_point)
             else:
                 break
-        '''
+
         '''
         # This is an alternative to the above iteration, which sets a fixed gas cooler outlet temperature
-        # Yet to be determined, whether this code is working
         fixed_gas_cooler_outlet_temp = 35 + 273.15
 
         try:
@@ -235,6 +234,7 @@ class StandardCycleTranscritical(BaseCycle):
             raise e_gc_calc
         '''
 
+        '''
         user_defined_T_gc_outlet_K = None  # Initialize
         if hasattr(self, 'user_defined_fixed_T_gc_outlet_K') and self.user_defined_fixed_T_gc_outlet_K is not None:
             user_defined_T_gc_outlet_K = self.user_defined_fixed_T_gc_outlet_K
@@ -273,6 +273,7 @@ class StandardCycleTranscritical(BaseCycle):
                 f"Error during self.condenser.calc() with fixed outlet: {e_gc_calc}"
             )
             raise  # Re-raise the exception
+        '''
 
         self.expansion_valve.state_inlet = self.condenser.state_outlet
         self.expansion_valve.calc_outlet(p_outlet=p_1)
