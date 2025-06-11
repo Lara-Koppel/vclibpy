@@ -36,7 +36,7 @@ class ReciprocatingCompressor(Compressor):
                  eta_is_b2: float = -0.2803,
                  eta_is_b3: float = 0.0414,
                  eta_is_b4: float = -0.0022):
-        super.__init__(N_max=N_max, V_h=V_h)
+        super().__init__(N_max=N_max, V_h=V_h)
         # Store all parameters as instance variables
         self.eta_mech_const = eta_mech
         self.lambda_a0 = lambda_a0
@@ -59,7 +59,7 @@ class ReciprocatingCompressor(Compressor):
         Returns:
             float: volumetric efficiency.
         """
-        pi = self.get.p_outlet() / self.state_inlet.p
+        pi = self.get_p_outlet() / self.state_inlet.p
         lambda_h = (
                 self.lambda_a0 +
                 self.lambda_a1 * pi +
