@@ -49,11 +49,21 @@ def main(use_condenser_inlet: bool = True):
     from vclibpy.components.expansion_valves import Bernoulli
     expansion_valve = Bernoulli(A=0.1)
 
+    from vclibpy.components.compressors import ReciprocatingCompressor
     from vclibpy.components.compressors import RotaryCompressor
+
     compressor = RotaryCompressor(
         N_max=125,
         V_h=19e-6
     )
+
+    '''
+    compressor = ReciprocatingCompressor(
+        N_max=125,
+        V_h=19e-6,
+        eta_mech=0.88,
+    )
+    '''
 
     # Now, we can plug everything into the flowsheet:
     flowsheet = StandardCycleTranscritical(
@@ -71,9 +81,9 @@ def main(use_condenser_inlet: bool = True):
     if not os.path.exists(save_path):
         os.makedirs(save_path)
         print(f"Info: Save path {save_path} has been created.")
-    T_eva_in_ar = [15 + 273.15,]
-    T_con_ar = [50 + 273.15]
-    n_ar = [0.3, 0.7, 1]
+    T_eva_in_ar = [10 + 273.15,]
+    T_con_ar = [20 + 273.15]
+    n_ar = [0.7]
 
     # Now, we can generate the full-factorial performance map
     # using all inputs. The results will be stored under the
