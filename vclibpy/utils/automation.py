@@ -11,7 +11,7 @@ import pandas as pd
 import time
 from vclibpy.datamodels import FlowsheetState, Inputs, RelativeCompressorSpeedControl, HeatExchangerInputs
 from vclibpy.flowsheets import BaseCycle
-from vclibpy.algorithms import Algorithm, Iteration
+from vclibpy.algorithms import Algorithm, Iteration_TC
 from vclibpy import utils, media
 
 logger = logging.getLogger(__name__)
@@ -190,7 +190,7 @@ def full_factorial_map_generation(
     os.makedirs(run_specific_save_path, exist_ok=True)
 
     if algorithm is None:
-        algorithm = Iteration()
+        algorithm = Iteration_TC()
     if save_plots:
         plot_directory_name = f"plots_{flowsheet.flowsheet_name}_{flowsheet.fluid}"
         algorithm.save_path_plots = run_specific_save_path.joinpath(plot_directory_name)
