@@ -180,10 +180,10 @@ def calculate_single_point():
     from vclibpy.algorithms.iteration import Iteration
     from vclibpy.utils.plotting import plot_cycle
 
-    save_path = r"D:\00_temp\standard_transcritical_cycle"
+    save_path = r"D:\00_temp\Standard_TC_SP"
     if not os.path.exists(save_path):
         os.makedirs(save_path)
-        print(f"Info: Save path {save_path} created.")
+        print(f"Info: Save path {save_path} has been created.")
 
     algorithm = Iteration(raise_errors=True, save_path_plots=save_path, show_iteration=True)
     speed_control = RelativeCompressorSpeedControl(0.2, 0.0, 0)
