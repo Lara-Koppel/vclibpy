@@ -151,7 +151,7 @@ def calculate_single_point():
     from vclibpy.flowsheets import StandardCycleTranscritical
     from vclibpy.components.heat_exchangers import moving_boundary_ntu
     from vclibpy.components.heat_exchangers import heat_transfer
-    from vclibpy.algorithms.iteration import Iteration
+    # from vclibpy.algorithms.iteration import Iteration
 
     condenser = moving_boundary_ntu.MovingBoundaryNTUGasCooler(
         A=30,
@@ -197,14 +197,14 @@ def calculate_single_point():
     logging.basicConfig(level="INFO")
 
     from vclibpy.datamodels import Inputs, RelativeCompressorSpeedControl, HeatExchangerInputs
-    from vclibpy.algorithms.iteration import Iteration
+    from vclibpy.algorithms.iteration_tc_dev import Iteration_TC
     from vclibpy.utils.plotting import plot_cycle
 
     save_path = r"D:\00_temp\Standard_TC_SP"
     if not os.path.exists(save_path):
         os.makedirs(save_path)
         print(f"Info: Save path {save_path} has been created.")
-    algorithm = Iteration(raise_errors=True, save_path_plots=save_path, show_iteration=True)
+    algorithm = Iteration_TC(raise_errors=True, save_path_plots=save_path, show_iteration=True)
     speed_control = RelativeCompressorSpeedControl(0.2, 5.0, 0)
     eva_inputs = HeatExchangerInputs(T_in=18 + 273.15, m_flow=1)
     con_inputs = HeatExchangerInputs(T_in=28 + 273.15, m_flow=1)
@@ -217,23 +217,29 @@ def calculate_single_point():
 
     fs_state = algorithm.calc_steady_state(flowsheet, inputs, "CarbonDioxide")
     #plot_cycle(flowsheet.med_prop, flowsheet.get_states_in_order_for_plotting(), show=True)
-    print(f"Compressor:")
-    print(f"m_flow = {flowsheet.compressor.m_flow * 3600} kg/h")
-    print(f"state_inlet = {flowsheet.compressor.state_inlet}")
-    print(f"state_outlet = {flowsheet.compressor.state_outlet}")
-    print(f"Condenser:")
-    print(f"m_flow = {flowsheet.condenser.m_flow * 3600} kg/h")
-    print(f"state_inlet = {flowsheet.condenser.state_inlet}")
-    print(f"state_outlet = {flowsheet.condenser.state_outlet}")
-    print(f"Temperature secondary_inlet = {flowsheet.condenser.T_in}")
-    print(f"Temperature secondary_outlet = {flowsheet.condenser.T_out}")
-    print(f"Evaporator:")
-    print(f"m_flow = {flowsheet.evaporator.m_flow * 3600} kg/h")
-    print(f"state_inlet = {flowsheet.evaporator.state_inlet}")
-    print(f"state_outlet = {flowsheet.evaporator.state_outlet}")
-    print(f"COP: {fs_state.get('COP').value}")
+    if fs_state is not None:
+        print("\n--- Berechnung erfolgreich! Ergebnisse: ---")
+        # plot_cycle(flowsheet.med_prop, flowsheet.get_states_in_order_for_plotting(), show=True)
+        print(f"Compressor:")
+        print(f"m_flow = {flowsheet.compressor.m_flow * 3600} kg/h")
+        print(f"state_inlet = {flowsheet.compressor.state_inlet}")
+        print(f"state_outlet = {flowsheet.compressor.state_outlet}")
+        print(f"Condenser:")
+        print(f"m_flow = {flowsheet.condenser.m_flow * 3600} kg/h")
+        print(f"state_inlet = {flowsheet.condenser.state_inlet}")
+        print(f"state_outlet = {flowsheet.condenser.state_outlet}")
+        print(f"Temperature secondary_inlet = {flowsheet.condenser.T_in}")
+        print(f"Temperature secondary_outlet = {flowsheet.condenser.T_out}")
+        print(f"Evaporator:")
+        print(f"m_flow = {flowsheet.evaporator.m_flow * 3600} kg/h")
+        print(f"state_inlet = {flowsheet.evaporator.state_inlet}")
+        print(f"state_outlet = {flowsheet.evaporator.state_outlet}")
+        print(f"COP: {fs_state.get('COP').value}")
+    else:
+        print(
+            "\n--- Berechnung NICHT erfolgreich. Der Algorithmus konnte für die gegebenen Inputs keine Lösung finden. ---")
 
 
 if __name__ == "__main__":
-    main(use_condenser_inlet=True)
-    # calculate_single_point()
+    # main(use_condenser_inlet=True)
+    calculate_single_point()
