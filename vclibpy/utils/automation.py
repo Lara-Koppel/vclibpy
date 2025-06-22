@@ -8,13 +8,22 @@ from typing import List, Union
 import multiprocessing
 import numpy as np
 import pandas as pd
-import time
+from datetime import datetime
+from pathlib import Path
 from vclibpy.datamodels import FlowsheetState, Inputs, RelativeCompressorSpeedControl, HeatExchangerInputs
 from vclibpy.flowsheets import BaseCycle
 from vclibpy.algorithms import Algorithm, Iteration_TC
 from vclibpy import utils, media
 
 logger = logging.getLogger(__name__)
+
+def create_timestamped_folder(base_path: str, prefix: str = "") -> Path:
+    """Erstellt einen einzigartigen, mit Zeitstempel versehenen Unterordner."""
+    time_now = datetime.now().strftime('%Y%m%d_%H%M')
+    folder_name = f"{prefix}_{time_now}" if prefix else time_now
+    full_path = Path(base_path).joinpath(folder_name)
+    os.makedirs(full_path, exist_ok=True)
+    return full_path
 
 
 def calc_multiple_states(
@@ -182,18 +191,11 @@ def full_factorial_map_generation(
         dT_con_subcooling
     ]
 
-    if isinstance(save_path, str):
-        save_path = pathlib.Path(save_path)
-
-    timestamp = time.strftime("%Y%m%d-%H%M")
-    run_specific_save_path = save_path.joinpath(f"{flowsheet.flowsheet_name}_{timestamp}")
-    os.makedirs(run_specific_save_path, exist_ok=True)
-
     if algorithm is None:
         algorithm = Iteration_TC()
     if save_plots:
         plot_directory_name = f"plots_{flowsheet.flowsheet_name}_{flowsheet.fluid}"
-        algorithm.save_path_plots = run_specific_save_path.joinpath(plot_directory_name)
+        algorithm.save_path_plots = save_path.joinpath(plot_directory_name)
         os.makedirs(algorithm.save_path_plots, exist_ok=True)
 
     list_mp_inputs = []
@@ -287,8 +289,8 @@ def full_factorial_map_generation(
 
     # Save to excel
     base_filename = f"{flowsheet.flowsheet_name}_{flowsheet.fluid}"
-    save_path_sdf = run_specific_save_path.joinpath(f"{base_filename}.sdf")
-    save_path_csv = run_specific_save_path.joinpath(f"{base_filename}.csv")
+    save_path_sdf = save_path.joinpath(f"{base_filename}.sdf")
+    save_path_csv = save_path.joinpath(f"{base_filename}.csv")
     pd.DataFrame(variables_to_excel).to_csv(
         save_path_csv,
         sep=";",
