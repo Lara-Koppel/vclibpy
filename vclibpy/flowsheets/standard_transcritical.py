@@ -197,11 +197,11 @@ class StandardCycleTranscritical(BaseCycle):
             pinch_point += step_pinch_point
         self.condenser.state_outlet = self.set_condenser_outlet_based_on_pinch_point(p_2=p_2, inputs=inputs,
                                                                                      pinch_point=pinch_point)
-        print(f"Error: {error}, T_con_out: {self.condenser.state_outlet.T}")
+        #print(f"Error: {error}, T_con_out: {self.condenser.state_outlet.T}")
         while True:
             error, dT_min = self.condenser.calc(inputs=inputs, fs_state=fs_state)
             error_history.append(error)
-            #print(f"Error: {error}, T_con_out: {self.condenser.state_outlet.T}")
+            print(f"Error: {error}, T_con_out: {self.condenser.state_outlet.T}")
 
             if numpy.sign(error_history[-1]) != numpy.sign(error_history[-2]):
                 step_pinch_point /= 10
