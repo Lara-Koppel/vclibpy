@@ -100,8 +100,7 @@ class Iteration_TC(Algorithm):
         min_step_p2_bar = 0.1
 
         # History-Listen
-        p_1_history, p_2_history, cop_history, error_eva_history, dT_eva_history, dT_con_history, differential_history = (
-        [] for _ in range(7))
+        p_1_history, p_2_history, cop_history, error_eva_history, error_con_history, dT_eva_history, dT_con_history, differential_history = ([] for _ in range(8))
 
         last_converged_cop = np.nan
         last_p2_bar = np.nan
@@ -154,12 +153,12 @@ class Iteration_TC(Algorithm):
                     continue
 
                 # Datensammlung bei JEDEM inneren Schritt
-                current_values = [p_1 * 1e-5, p_2 * 1e-5, current_cop, error_eva, dT_min_eva, dT_min_con]
-                all_histories = [p_1_history, p_2_history, cop_history, error_eva_history, dT_eva_history,
+                current_values = [p_1 * 1e-5, p_2 * 1e-5, current_cop, error_eva, error_con, dT_min_eva, dT_min_con]
+                all_histories = [p_1_history, p_2_history, cop_history, error_eva_history, error_con_history, dT_eva_history,
                                  dT_con_history]
                 for lst, val in zip(all_histories, current_values): lst.append(val)
 
-                if self.show_iteration and (i_inner % 10 == 0 or i_inner < 5):
+                if self.show_iteration:
                     plot_data_map = {0: error_eva_history, 1: cop_history, 2: dT_eva_history, 3: dT_con_history,
                                      4: p_1_history, 5: p_2_history}
                     plot_window = 50
@@ -215,11 +214,31 @@ class Iteration_TC(Algorithm):
 
                 if step_p2_bar <= min_step_p2_bar:
                     logger.info("Outer loop converged: p_2 step size is below tolerance.")
-                    if self.show_iteration and self.save_path_plots:
-                        fig_iterations.savefig(
-                            self.save_path_plots.joinpath(f"{inputs.get_name()}_convergence_plot_SUCCESS.png"))
-                    if self.show_iteration: plt.close(fig_iterations)
-                    flowsheet.iteration_converged = True;
+
+                    # NEU: DataFrame erstellen und als Excel/CSV speichern
+                    if self.save_path_plots:
+                        # Erstelle das DataFrame aus den kompletten Listen
+                        df_history = pd.DataFrame({
+                            "p_1": p_1_history,
+                            "p_2": p_2_history,
+                            "error_con": error_con_history,
+                            "error_eva": error_eva_history,
+                            "dT_con": dT_con_history,
+                            "dT_eva": dT_eva_history,
+                            "cop": cop_history,
+                        })
+                        # Speichere die Datei (z.B. als CSV mit Semikolon)
+                        filepath = self.save_path_plots.joinpath(f"{inputs.get_name()}_TC_history.csv")
+                        df_history.to_csv(filepath, sep=';', decimal=',', index_label="Iteration")
+                        logger.info(f"Complete iteration history saved to {filepath}")
+
+                    if self.show_iteration:
+                        if self.save_path_plots:
+                            fig_iterations.savefig(
+                                self.save_path_plots.joinpath(f"{inputs.get_name()}_convergence_plot_SUCCESS.png"))
+                        plt.close(fig_iterations)
+
+                    flowsheet.iteration_converged = True
                     fs_state.set(name="converged", value=1, unit="-")
                     return flowsheet.calculate_outputs_for_valid_pressures(p_1=p_1, p_2=p_2, inputs=inputs,
                                                                            fs_state=fs_state,
