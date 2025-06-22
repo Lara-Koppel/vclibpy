@@ -73,17 +73,19 @@ def main(use_condenser_inlet: bool = True):
         compressor=compressor,
         expansion_valve=expansion_valve,
     )
+
+    from vclibpy.utils.automation import create_timestamped_folder
     # As in the other example, we can specify save-paths,
     # solver settings and inputs to vary:
     # Note that T_con can either be inlet or outlet, depending on the setting
     # of `use_condenser_inlet`. Per default, we simulate the inlet, T_con_in
-    save_path = r"D:\00_temp\Standard_TC_FFMG"
-    if not os.path.exists(save_path):
-        os.makedirs(save_path)
-        print(f"Info: Save path {save_path} has been created.")
-    T_eva_in_ar = [10 + 273.15,]
-    T_con_ar = [20 + 273.15]
-    n_ar = [0.7]
+    base_save_path = r"D:\00_temp\Standard_TC_FFMG"
+    timestamped_save_path = create_timestamped_folder(base_path=base_save_path, prefix="MultiPointRun")
+    print(f"Info: Result-folder for this run created: {timestamped_save_path}")
+
+    T_eva_in_ar = [18 + 273.15,]
+    T_con_ar = [30 + 273.15]
+    n_ar = [0.2]
 
     # Now, we can generate the full-factorial performance map
     # using all inputs. The results will be stored under the
@@ -95,7 +97,7 @@ def main(use_condenser_inlet: bool = True):
     from vclibpy import utils
     save_path_sdf, save_path_csv = utils.full_factorial_map_generation(
         flowsheet=flowsheet,
-        save_path=save_path,
+        save_path=timestamped_save_path,
         T_con=T_con_ar,
         T_eva_in=T_eva_in_ar,
         n=n_ar,
@@ -111,7 +113,7 @@ def main(use_condenser_inlet: bool = True):
     # What did just happen? We can analyze all results by listing the
     # files in the save-path - or just open it in our default system explorer.
 
-    print(os.listdir(save_path))
+    print(os.listdir(timestamped_save_path))
     # One file should be: `Standard_Propane.csv`. We can load this file and plot
     # the values using e.g. pandas. It is also the second return value of the function.
     import pandas as pd
@@ -154,7 +156,7 @@ def calculate_single_point():
     # from vclibpy.algorithms.iteration import Iteration
 
     condenser = moving_boundary_ntu.MovingBoundaryNTUGasCooler(
-        A=30,
+        A=80,
         secondary_medium="air",
         flow_type="counter",
         ratio_outer_to_inner_area=10,
@@ -199,15 +201,16 @@ def calculate_single_point():
     from vclibpy.datamodels import Inputs, RelativeCompressorSpeedControl, HeatExchangerInputs
     from vclibpy.algorithms.iteration_tc_dev import Iteration_TC
     from vclibpy.utils.plotting import plot_cycle
+    from vclibpy.utils.automation import create_timestamped_folder
 
-    save_path = r"D:\00_temp\Standard_TC_SP"
-    if not os.path.exists(save_path):
-        os.makedirs(save_path)
-        print(f"Info: Save path {save_path} has been created.")
-    algorithm = Iteration_TC(raise_errors=True, save_path_plots=save_path, show_iteration=True)
+    base_save_path = r"D:\00_temp\Standard_TC_SP"
+    timestamped_save_path = create_timestamped_folder(base_path=base_save_path, prefix="SinglePointRun")
+    print(f"Info: Result-folder for this run created: {timestamped_save_path}")
+
+    algorithm = Iteration_TC(raise_errors=True, save_path_plots=timestamped_save_path, show_iteration=False)
     speed_control = RelativeCompressorSpeedControl(0.2, 5.0, 0)
     eva_inputs = HeatExchangerInputs(T_in=18 + 273.15, m_flow=1)
-    con_inputs = HeatExchangerInputs(T_in=28 + 273.15, m_flow=1)
+    con_inputs = HeatExchangerInputs(T_in=30 + 273.15, m_flow=1)
     inputs = Inputs(control=speed_control, evaporator=eva_inputs, condenser=con_inputs)
     # print(f"DEBUG: Overheating: {inputs.control.dT_eva_superheating}")
 
@@ -218,7 +221,7 @@ def calculate_single_point():
     fs_state = algorithm.calc_steady_state(flowsheet, inputs, "CarbonDioxide")
     #plot_cycle(flowsheet.med_prop, flowsheet.get_states_in_order_for_plotting(), show=True)
     if fs_state is not None:
-        print("\n--- Berechnung erfolgreich! Ergebnisse: ---")
+        print("\n--- Calculation successfull! Results: ---")
         # plot_cycle(flowsheet.med_prop, flowsheet.get_states_in_order_for_plotting(), show=True)
         print(f"Compressor:")
         print(f"m_flow = {flowsheet.compressor.m_flow * 3600} kg/h")
@@ -237,7 +240,7 @@ def calculate_single_point():
         print(f"COP: {fs_state.get('COP').value}")
     else:
         print(
-            "\n--- Berechnung NICHT erfolgreich. Der Algorithmus konnte für die gegebenen Inputs keine Lösung finden. ---")
+            "\n--- Calculation NOT successfull. Algorithm couldn't find a solution for given Inputs. ---")
 
 
 if __name__ == "__main__":
