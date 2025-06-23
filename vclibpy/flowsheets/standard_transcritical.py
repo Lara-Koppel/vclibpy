@@ -4,6 +4,7 @@ from vclibpy.components.compressors import Compressor
 from vclibpy.components.expansion_valves import ExpansionValve
 import numpy
 import logging
+from scipy.optimize import fsolve
 
 
 class StandardCycleTranscritical(BaseCycle):
@@ -52,7 +53,6 @@ class StandardCycleTranscritical(BaseCycle):
             self.expansion_valve
         ]
 
-
     # In this function, all the states of the cycle are defined. Compared to the old subcritical cycle
     # we don't have a constant temperature in the two-phase region. Before it was only a return function
     # now it is a given state list.
@@ -71,8 +71,6 @@ class StandardCycleTranscritical(BaseCycle):
         h_in = self.condenser.state_inlet.h
         h_out = self.condenser.state_outlet.h
         h_steps = numpy.linspace(h_in, h_out, 20)
-
-
 
         for h_val in h_steps:
             inter_state = self.med_prop.calc_state("PH", p, h_val)
@@ -104,8 +102,6 @@ class StandardCycleTranscritical(BaseCycle):
                                       "Condenser inlet temperature for secondary side needs to be provided.")
         return self.med_prop.calc_state("PT", p_2, T_in + pinch_point)
 
-
-
     def calc_states(self, p_1, p_2, inputs: Inputs, fs_state: FlowsheetState):
         """
         This function calculates the states of a standard heat pump under
@@ -119,7 +115,6 @@ class StandardCycleTranscritical(BaseCycle):
         - Output of the evaporator and output of the condenser maintain
           a constant overheating or subcooling (can be set in Inputs).
         """
-
 
         # last_cop = 1
         # q_4_step = 0.1
@@ -161,7 +156,7 @@ class StandardCycleTranscritical(BaseCycle):
         # Calling the function from base.py to set the evaporator outlet based on superheating
         # When superheating > 0, the outlet state is calculated based on "PT" so given pressure and outlet temperature.
         self.set_evaporator_outlet_based_on_superheating(p_eva=p_1, inputs=inputs)
-        self.compressor.state_inlet = self.evaporator.state_outlet                      # Setting the compressor inlet state to the evaporator outlet state, assuming no losses
+        self.compressor.state_inlet = self.evaporator.state_outlet  # Setting the compressor inlet state to the evaporator outlet state, assuming no losses
 
         # Calling the function from compressor.py to calculate the compressor outlet state
         # Isentropic state is calculated based on p_2, entropy of inlet state (see self.compressor.state_inlet = self.evaporator.state_outlet)
@@ -179,7 +174,34 @@ class StandardCycleTranscritical(BaseCycle):
         self.evaporator.m_flow = self.compressor.m_flow
         self.expansion_valve.m_flow = self.compressor.m_flow
 
+        # Wir definieren eine "Zielfunktion", die den Kondensatorfehler zurückgibt.
+        # Der Solver wird den Input dieser Funktion (T_3_guess) so lange ändern,
+        # bis der Output (error) null ist.
+        def get_condenser_error(T_3_guess):
+            # Setze den angenommenen Austrittszustand am Kondensator
+            self.condenser.state_outlet = self.med_prop.calc_state("PT", p_2, T_3_guess)
+            # Berechne den resultierenden Fehler mit dem Wärmetauschermodell
+            error, _ = self.condenser.calc(inputs=inputs, fs_state=fs_state)
+            return error
 
+        # Definiere einen sinnvollen Startwert für die Suche nach T_3
+        T_con_sec_in = inputs.condenser.T_in
+        T_3_initial_guess = T_con_sec_in + 3.0  # Unsere bewährte 3-K-Annahme als Startpunkt
+
+        try:
+            # Führe die Nullstellensuche mit fsolve durch.
+            # fsolve gibt ein Array zurück, wir brauchen nur das erste Element.
+            T_3_solution, = fsolve(get_condenser_error, x0=T_3_initial_guess, xtol=0.01)
+
+            # Setze den finalen, korrekten Austrittszustand
+            self.condenser.state_outlet = self.med_prop.calc_state("PT", p_2, T_3_solution)
+        except Exception as e:
+            # Falls fsolve aus anderen Gründen fehlschlägt (z.B. keine Konvergenz)
+            logging.error(
+                f"Condenser solver 'fsolve' failed to find a solution starting from T_3={T_3_initial_guess:.2f} K. Error: {e}")
+            raise
+
+        '''
         # iterate the condenser outlet temperature based on energy balance
         max_err_q = 0.5
         error_history = []
@@ -190,7 +212,7 @@ class StandardCycleTranscritical(BaseCycle):
         # First iteration outside while loop to get the first error
         error, dT_min = self.condenser.calc(inputs=inputs, fs_state=fs_state)
         error_history.append(error)
-        #print(f"Error: {error}, T_con_out: {self.condenser.state_outlet.T}")
+        # print(f"Error: {error}, T_con_out: {self.condenser.state_outlet.T}")
         if error > 0:
             pinch_point -= step_pinch_point
         else:
@@ -201,7 +223,7 @@ class StandardCycleTranscritical(BaseCycle):
         while True:
             error, dT_min = self.condenser.calc(inputs=inputs, fs_state=fs_state)
             error_history.append(error)
-            print(f"Error: {error}, T_con_out: {self.condenser.state_outlet.T}")
+            # print(f"Error: {error}, T_con_out: {self.condenser.state_outlet.T}")
 
             if numpy.sign(error_history[-1]) != numpy.sign(error_history[-2]):
                 step_pinch_point /= 10
@@ -214,6 +236,7 @@ class StandardCycleTranscritical(BaseCycle):
                 self.condenser.state_outlet = self.set_condenser_outlet_based_on_pinch_point(p_2=p_2, inputs=inputs, pinch_point=pinch_point)
             else:
                 break
+                '''
 
         '''
         # This is an alternative to the above iteration, which sets a fixed gas cooler outlet temperature
@@ -308,5 +331,3 @@ class StandardCycleTranscritical(BaseCycle):
     def calc_electrical_power(self, inputs: Inputs, fs_state: FlowsheetState):
         """Based on simple energy balance - Adiabatic"""
         return self.compressor.calc_electrical_power(inputs=inputs, fs_state=fs_state)
-
-
