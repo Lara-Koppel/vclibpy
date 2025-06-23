@@ -114,10 +114,12 @@ class Iteration_TC(Algorithm):
 
         if self.show_iteration:
             plt.ion()
-            fig_iterations, ax_iterations = plt.subplots(3, 2, figsize=(12, 10), sharex=True)
-            ax_labels = [("error_eva in %", "COP in -"),
-                         ("$\Delta T_\mathrm{Min, Eva}$ in K", "$\Delta T_\mathrm{Min, Con}$ in K"),
-                         ("$p_1$ in bar", "$p_2$ in bar")]
+            fig_iterations, ax_iterations = plt.subplots(3, 3, figsize=(15, 9), sharex=True)
+            ax_labels = [
+                ("error_eva in %", "error_con in %", ""), # Last plot is empty on purpose
+                ("COP in -", "$\Delta T_\mathrm{Min, Con}$ in K", "$\Delta T_\mathrm{Min, Eva}$ in K"),
+                ("$p_1$ in bar", "$p_2$ in bar", "")  # Last plot is empty on purpose
+            ]
             for i, row in enumerate(ax_iterations):
                 for j, ax in enumerate(row):
                     ax.set_ylabel(ax_labels[i][j])
@@ -126,6 +128,18 @@ class Iteration_TC(Algorithm):
             plt.tight_layout(pad=2.0)
 
         for i_outer in range(150):
+
+            if i_outer == 0 and self.save_path_plots:
+                try:
+                    flowsheet.calculate_cycle_for_pressures(p_1=p_1, p_2=p_2, inputs=inputs, fs_state=fs_state)
+
+                    input_name = inputs.get_name()
+                    filepath = self.save_path_plots.joinpath(f"{input_name}_initialization_plot.svg")
+                    flowsheet.plot_cycle(save_path=filepath, inputs=inputs)
+                    logger.info(f"Initial state plot saved to {filepath}")
+                except Exception as e:
+                    logger.warning(f"Could not create initial state plot: {e}")
+
             if p_2 < p_2_min_limit:
                 if self.show_iteration:
                     if self.save_path_plots:
@@ -159,15 +173,25 @@ class Iteration_TC(Algorithm):
                 for lst, val in zip(all_histories, current_values): lst.append(val)
 
                 if self.show_iteration:
-                    plot_data_map = {0: error_eva_history, 1: cop_history, 2: dT_eva_history, 3: dT_con_history,
-                                     4: p_1_history, 5: p_2_history}
-                    plot_window = 50
+                    plot_data_map = {
+                        0: error_eva_history,
+                        1: error_con_history,
+                        3: cop_history,
+                        4: dT_con_history,
+                        5: dT_eva_history,
+                        6: p_1_history,
+                        7: p_2_history
+                    }
+                    plot_window = 30
                     total_steps = len(p_1_history)
                     iterations_to_plot = range(max(0, total_steps - plot_window), total_steps)
                     for i, ax in enumerate(ax_iterations.flatten()):
-                        ax.cla();
-                        ax.plot(iterations_to_plot, plot_data_map[i][-plot_window:], 'o-', markersize=2);
-                        ax.grid(True)
+                        if i in plot_data_map:
+                            ax.cla()
+                            # Nur plotten, wenn die History-Liste nicht leer ist!
+                            if plot_data_map[i]:
+                                ax.plot(iterations_to_plot, plot_data_map[i][-plot_window:], 'o-', markersize=2)
+                            ax.grid(True)
                     for i, row in enumerate(ax_iterations):
                         for j, ax in enumerate(row):
                             ax.set_ylabel(ax_labels[i][j])
@@ -175,7 +199,7 @@ class Iteration_TC(Algorithm):
                     plt.tight_layout(pad=2.0)
                     plt.pause(0.01)
 
-                # --- ROBUSTES ABBRUCHKRITERIUM ---
+                # --- more robust termination criteria ---
                 is_converged_by_accuracy = abs(error_eva) < 1e-3
                 is_oscillating = i_inner > 0 and np.sign(error_eva) != np.sign(error_eva_history_inner[-1])
                 if is_oscillating: step_p1 = max(step_p1 / 2.0, min_step_p1)
@@ -185,7 +209,7 @@ class Iteration_TC(Algorithm):
                     logger.info(
                         f"Inner loop converged for p_2={p_2 * 1e-5:.2f} bar after {i_inner + 1} steps. Final p_1={p_1 * 1e-5:.2f} bar.")
                     p_1_stable = True
-                    break  # ERFOLG! Verlasse die innere Schleife.
+                    break
 
                 error_eva_history_inner.append(error_eva)
                 p_1 += np.sign(error_eva) * step_p1
@@ -199,8 +223,87 @@ class Iteration_TC(Algorithm):
                 if self.show_iteration: plt.close(fig_iterations)
                 return None
 
-            # --- ÄUßERE SCHLEIFENLOGIK (wird jetzt erreicht) ---
-            final_cop_for_this_p2 = cop_history[-1]
+
+            # -------------------------------------------------------------------------
+            # 1. Hole den finalen COP und den Pinch-Point aus der inneren Schleife
+            final_cop_for_this_p2 = cop_history[-1] if cop_history else np.nan
+
+            min_pinch_spec = 3.0
+            if dT_min_con < min_pinch_spec:
+                final_cop_for_this_p2 = -1.0
+
+            warning_zone_pressure = p_2_min_limit + 2e5
+            if p_2 < warning_zone_pressure:
+                final_cop_for_this_p2 = -1.0
+
+            # 2. Füge hier die "adaptive Bremse" hinzu (falls noch nicht geschehen)
+            if p_2 < (warning_zone_pressure + step_p2_bar * 1e5):
+                step_p2_bar = max(step_p2_bar / 3, min_step_p2_bar)
+                logging.info(f"Approaching critical zone, reducing p2 step size to {step_p2_bar:.2f} bar.")
+
+            # 3. Führe die ursprüngliche COP-Optimierung durch
+            p2_bar_current = p_2 * 1e-5
+            if not np.isnan(last_p2_bar):
+                delta_p2 = p2_bar_current - last_p2_bar
+                local_differential = (final_cop_for_this_p2 - last_converged_cop) / delta_p2 if abs(
+                    delta_p2) > 1e-9 else 0
+                differential_history.append(local_differential)
+
+                if len(differential_history) > 1 and np.sign(differential_history[-1]) != np.sign(
+                        differential_history[-2]):
+                    step_p2_bar = max(step_p2_bar / 3, min_step_p2_bar)
+
+                if step_p2_bar <= min_step_p2_bar:
+                    # ... (Erfolgs-Logik mit Speichern und Plotten wie gehabt)
+                    # Stelle sicher, dass du hier nicht mehr versuchst, "objective" in die CSV zu schreiben!
+                    logger.info("Outer loop converged: p_2 step size is below tolerance.")
+
+                    if self.save_path_plots:
+                        df_history = pd.DataFrame({
+                            "p_1": p_1_history, "p_2": p_2_history, "error_con": error_con_history,
+                            "error_eva": error_eva_history, "dT_con": dT_con_history, "dT_eva": dT_eva_history,
+                            "cop": cop_history
+                        })
+                        filepath = self.save_path_plots.joinpath(f"{inputs.get_name()}_TC_history.csv")
+                        df_history.to_csv(filepath, sep=';', decimal=',', index_label="Iteration")
+                        logger.info(f"Complete iteration history saved to {filepath}")
+
+                    if self.show_iteration:
+                        if self.save_path_plots:
+                            fig_iterations.savefig(
+                                self.save_path_plots.joinpath(f"{inputs.get_name()}_convergence_plot_SUCCESS.png"))
+                        plt.close(fig_iterations)
+
+                    flowsheet.iteration_converged = True
+                    fs_state.set(name="converged", value=1, unit="-")
+
+                    # =========================================================================
+                    # == START DER KORREKTUR ==
+                    # =========================================================================
+                    # Dies ist der korrekte, finale return-Befehl, der alle Argumente übergibt.
+                    return flowsheet.calculate_outputs_for_valid_pressures(
+                        p_1=p_1,
+                        p_2=p_2,
+                        inputs=inputs,
+                        fs_state=fs_state,
+                        save_path_plots=self.save_path_plots
+                    )
+                    # =========================================================================
+                    # == ENDE DER KORREKTUR ==
+
+                p_2 += np.sign(
+                    local_differential) * step_p2_bar * 1e5 if local_differential != 0 else -step_p2_bar * 1e5
+            else:
+                p_2 -= step_p2_bar * 1e5
+
+            # 4. Speichere den (ggf. modifizierten) COP für den nächsten Vergleich
+            last_converged_cop = final_cop_for_this_p2
+            last_p2_bar = p2_bar_current
+            # -------------------------------------------------------------------------
+
+            '''
+            # To be commented out if fixed pinch point calculation is used
+            # final_cop_for_this_p2 = cop_history[-1]
             p2_bar_current = p_2 * 1e-5
             if not np.isnan(last_p2_bar):
                 delta_p2 = p2_bar_current - last_p2_bar
@@ -251,6 +354,7 @@ class Iteration_TC(Algorithm):
 
             last_converged_cop = final_cop_for_this_p2
             last_p2_bar = p2_bar_current
+            '''
 
         logger.warning("Breaking: Max outer iterations reached.")
         if self.show_iteration and self.save_path_plots:
