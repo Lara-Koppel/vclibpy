@@ -200,6 +200,7 @@ def calculate_single_point():
 
     from vclibpy.datamodels import Inputs, RelativeCompressorSpeedControl, HeatExchangerInputs
     from vclibpy.algorithms.iteration_tc_dev import Iteration_TC
+    from vclibpy.algorithms.iteration_tc_pinch_solver import Iteration_TC_Pinch
     from vclibpy.utils.plotting import plot_cycle
     from vclibpy.utils.automation import create_timestamped_folder
 
@@ -207,10 +208,10 @@ def calculate_single_point():
     timestamped_save_path = create_timestamped_folder(base_path=base_save_path, prefix="SinglePointRun")
     print(f"Info: Result-folder for this run created: {timestamped_save_path}")
 
-    algorithm = Iteration_TC(raise_errors=True, save_path_plots=timestamped_save_path, show_iteration=False)
+    algorithm = Iteration_TC_Pinch(raise_errors=True, save_path_plots=timestamped_save_path, show_iteration=True)
     speed_control = RelativeCompressorSpeedControl(0.2, 5.0, 0)
-    eva_inputs = HeatExchangerInputs(T_in=18 + 273.15, m_flow=1)
-    con_inputs = HeatExchangerInputs(T_in=30 + 273.15, m_flow=1)
+    eva_inputs = HeatExchangerInputs(T_in=30 + 273.15, m_flow=1)
+    con_inputs = HeatExchangerInputs(T_out=50 + 273.15, m_flow=1)
     inputs = Inputs(control=speed_control, evaporator=eva_inputs, condenser=con_inputs)
     # print(f"DEBUG: Overheating: {inputs.control.dT_eva_superheating}")
 
@@ -240,7 +241,7 @@ def calculate_single_point():
         print(f"COP: {fs_state.get('COP').value}")
     else:
         print(
-            "\n--- Calculation NOT successfull. Algorithm couldn't find a solution for given Inputs. ---")
+            "\n--- Calculation NOT successful. Algorithm couldn't find a solution for given Inputs. ---")
 
 
 if __name__ == "__main__":
