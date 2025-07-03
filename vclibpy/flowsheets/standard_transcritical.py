@@ -177,29 +177,30 @@ class StandardCycleTranscritical(BaseCycle):
         # Wir definieren eine "Zielfunktion", die den Kondensatorfehler zurückgibt.
         # Der Solver wird den Input dieser Funktion (T_3_guess) so lange ändern,
         # bis der Output (error) null ist.
-        def get_condenser_error(T_3_guess):
-            # Setze den angenommenen Austrittszustand am Kondensator
+        def get_condenser_error(T_3_guess_array):
+            T_3_guess = T_3_guess_array[0]
             self.condenser.state_outlet = self.med_prop.calc_state("PT", p_2, T_3_guess)
-            # Berechne den resultierenden Fehler mit dem Wärmetauschermodell
             error, _ = self.condenser.calc(inputs=inputs, fs_state=fs_state)
             return error
 
-        # Definiere einen sinnvollen Startwert für die Suche nach T_3
-        T_con_sec_in = inputs.condenser.T_in
-        T_3_initial_guess = T_con_sec_in + 3.0  # Unsere bewährte 3-K-Annahme als Startpunkt
+        if inputs.condenser.uses_inlet:
+            T_con_sec_in = inputs.condenser.T_in
+            T_3_initial_guess = T_con_sec_in + 3.0
+        else:
+            T_con_sec_out = inputs.condenser.T_out
+            T_3_initial_guess = T_con_sec_out - 3.0
 
         try:
-            # Führe die Nullstellensuche mit fsolve durch.
-            # fsolve gibt ein Array zurück, wir brauchen nur das erste Element.
-            T_3_solution, = fsolve(get_condenser_error, x0=T_3_initial_guess, xtol=0.01)
+            T_3_solution_array, _, ier, _ = fsolve(get_condenser_error, x0=[T_3_initial_guess], xtol=0.01,
+                                                   full_output=True)
 
-            # Setze den finalen, korrekten Austrittszustand
-            self.condenser.state_outlet = self.med_prop.calc_state("PT", p_2, T_3_solution)
+            if ier != 1:
+                raise ValueError("fsolve_condenser_did_not_converge")
+
+            self.condenser.state_outlet = self.med_prop.calc_state("PT", p_2, T_3_solution_array[0])
+
         except Exception as e:
-            # Falls fsolve aus anderen Gründen fehlschlägt (z.B. keine Konvergenz)
-            logging.error(
-                f"Condenser solver 'fsolve' failed to find a solution starting from T_3={T_3_initial_guess:.2f} K. Error: {e}")
-            raise
+            raise ValueError("fsolve_condenser_did_not_converge") from e
 
         '''
         # iterate the condenser outlet temperature based on energy balance
@@ -236,7 +237,7 @@ class StandardCycleTranscritical(BaseCycle):
                 self.condenser.state_outlet = self.set_condenser_outlet_based_on_pinch_point(p_2=p_2, inputs=inputs, pinch_point=pinch_point)
             else:
                 break
-                '''
+        '''
 
         '''
         # This is an alternative to the above iteration, which sets a fixed gas cooler outlet temperature
