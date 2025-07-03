@@ -217,6 +217,24 @@ class Iteration_TC(Algorithm):
             if not p_1_stable:
                 logger.warning(
                     f"Inner loop for p_1 did not converge for p_2 = {p_2 * 1e-5:.2f} bar. Stopping outer loop.")
+
+
+                if self.save_path_plots:
+                    logger.info("Saving iteration history before exiting due to error...")
+                    df_history = pd.DataFrame({
+                        "p_1_bar": p_1_history,
+                        "p_2_bar": p_2_history,
+                        "error_con_percent": error_con_history,
+                        "error_eva_percent": error_eva_history,
+                        "dT_con_K": dT_con_history,
+                        "dT_eva_K": dT_eva_history,
+                        "cop": cop_history
+                    })
+                    filepath = self.save_path_plots.joinpath(f"{inputs.get_name()}_FAILED_TC_history.csv")
+                    df_history.to_csv(filepath, sep=';', decimal=',', index_label="Iteration")
+                    logger.info(f"Failed iteration history saved to {filepath}")
+
+
                 if self.show_iteration and self.save_path_plots:
                     fig_iterations.savefig(
                         self.save_path_plots.joinpath(f"{inputs.get_name()}_convergence_plot_FAILED.png"))
