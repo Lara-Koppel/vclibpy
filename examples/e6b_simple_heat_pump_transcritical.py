@@ -200,7 +200,7 @@ def calculate_single_point():
 
     from vclibpy.datamodels import Inputs, RelativeCompressorSpeedControl, HeatExchangerInputs
     from vclibpy.algorithms.iteration_tc_dev import Iteration_TC
-    from vclibpy.algorithms.iteration_tc_pinch_solver import Iteration_TC_Pinch
+    from vclibpy.algorithms.iteration_tc_cop_optimizer import Iteration_TC_Pinch
     from vclibpy.utils.plotting import plot_cycle
     from vclibpy.utils.automation import create_timestamped_folder
 

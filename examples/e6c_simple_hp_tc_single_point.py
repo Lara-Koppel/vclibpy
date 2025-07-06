@@ -4,7 +4,7 @@ def calculate_single_point():
     from vclibpy.flowsheets import StandardCycleTranscritical
     from vclibpy.components.heat_exchangers import moving_boundary_ntu
     from vclibpy.components.heat_exchangers import heat_transfer
-    from vclibpy.algorithms.iteration import Iteration
+    from vclibpy.algorithms.iteration_tc_cop_optimizer import Iteration_TC_COP_Optimizer
 
     condenser = moving_boundary_ntu.MovingBoundaryNTUGasCooler(
         A=80,
@@ -58,7 +58,7 @@ def calculate_single_point():
     timestamped_save_path = create_timestamped_folder(base_path=base_save_path, prefix="SinglePointRun")
     print(f"Info: Result-folder for this run created: {timestamped_save_path}")
 
-    algorithm = Iteration_TC(raise_errors=True, save_path_plots=timestamped_save_path, show_iteration=True)
+    algorithm = Iteration_TC_COP_Optimizer(raise_errors=True, save_path_plots=timestamped_save_path, show_iteration=True)
     speed_control = RelativeCompressorSpeedControl(0.2, 5.0, 0)
     eva_inputs = HeatExchangerInputs(T_in=0 + 273.15, m_flow=1)
     con_inputs = HeatExchangerInputs(T_in=35 + 273.15, m_flow=1)
