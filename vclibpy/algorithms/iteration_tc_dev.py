@@ -242,8 +242,16 @@ class Iteration_TC(Algorithm):
                 return None
 
 
-            # -------------------------------------------------------------------------
-            # 1. Hole den finalen COP und den Pinch-Point aus der inneren Schleife
+            final_cop_for_this_p2 = cop_history[-1] if cop_history else np.nan
+            final_error_con_for_this_p2 = error_con_history[-1] if error_con_history else np.nan
+
+
+            if abs(final_error_con_for_this_p2) > 1.0:
+                logger.warning(f"p1 is stable, but condenser error is high ({final_error_con_for_this_p2:.2f}%) "
+                               f"for p2={p_2 * 1e-5:.2f} bar. Penalizing this point.")
+                final_cop_for_this_p2 = -1.0
+
+
             final_cop_for_this_p2 = cop_history[-1] if cop_history else np.nan
 
             min_pinch_spec = 3.0
@@ -254,12 +262,12 @@ class Iteration_TC(Algorithm):
             if p_2 < warning_zone_pressure:
                 final_cop_for_this_p2 = -1.0
 
-            # 2. Füge hier die "adaptive Bremse" hinzu (falls noch nicht geschehen)
+
             if p_2 < (warning_zone_pressure + step_p2_bar * 1e5):
                 step_p2_bar = max(step_p2_bar / 3, min_step_p2_bar)
                 logging.info(f"Approaching critical zone, reducing p2 step size to {step_p2_bar:.2f} bar.")
 
-            # 3. Führe die ursprüngliche COP-Optimierung durch
+
             p2_bar_current = p_2 * 1e-5
             if not np.isnan(last_p2_bar):
                 delta_p2 = p2_bar_current - last_p2_bar
@@ -272,8 +280,7 @@ class Iteration_TC(Algorithm):
                     step_p2_bar = max(step_p2_bar / 3, min_step_p2_bar)
 
                 if step_p2_bar <= min_step_p2_bar:
-                    # ... (Erfolgs-Logik mit Speichern und Plotten wie gehabt)
-                    # Stelle sicher, dass du hier nicht mehr versuchst, "objective" in die CSV zu schreiben!
+
                     logger.info("Outer loop converged: p_2 step size is below tolerance.")
 
                     if self.save_path_plots:
@@ -295,10 +302,7 @@ class Iteration_TC(Algorithm):
                     flowsheet.iteration_converged = True
                     fs_state.set(name="converged", value=1, unit="-")
 
-                    # =========================================================================
-                    # == START DER KORREKTUR ==
-                    # =========================================================================
-                    # Dies ist der korrekte, finale return-Befehl, der alle Argumente übergibt.
+
                     return flowsheet.calculate_outputs_for_valid_pressures(
                         p_1=p_1,
                         p_2=p_2,
@@ -306,18 +310,14 @@ class Iteration_TC(Algorithm):
                         fs_state=fs_state,
                         save_path_plots=self.save_path_plots
                     )
-                    # =========================================================================
-                    # == ENDE DER KORREKTUR ==
 
                 p_2 += np.sign(
                     local_differential) * step_p2_bar * 1e5 if local_differential != 0 else -step_p2_bar * 1e5
             else:
                 p_2 -= step_p2_bar * 1e5
 
-            # 4. Speichere den (ggf. modifizierten) COP für den nächsten Vergleich
             last_converged_cop = final_cop_for_this_p2
             last_p2_bar = p2_bar_current
-            # -------------------------------------------------------------------------
 
             '''
             # To be commented out if fixed pinch point calculation is used
