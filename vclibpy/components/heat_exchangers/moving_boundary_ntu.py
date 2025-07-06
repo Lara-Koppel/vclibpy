@@ -298,6 +298,9 @@ class MovingBoundaryNTUEvaporator(ExternalHeatExchanger):
         T_sc = T_sh - Q_lat / self.m_flow_secondary_cp
         T_out = T_sc - Q_sc / self.m_flow_secondary_cp
 
+        self.T_in = inputs.evaporator.T_in
+        self.T_out = T_out
+
         # 1. Regime: Superheating
         Q_sh_ntu, A_sh = 0, 0
         if not np.isclose(Q_sh, 0) and not np.isclose(self.state_outlet.T, state_q1.T):
