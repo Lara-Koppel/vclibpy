@@ -239,9 +239,9 @@ class StandardCycleTranscritical(BaseCycle):
                 break
         '''
 
-        '''
+
         # This is an alternative to the above iteration, which sets a fixed gas cooler outlet temperature
-        fixed_gas_cooler_outlet_temp = 35 + 273.15
+        fixed_gas_cooler_outlet_temp = 40 + 273.15
 
         try:
             self.condenser.state_outlet = self.med_prop.calc_state("PT", p_2, fixed_gas_cooler_outlet_temp)
@@ -256,7 +256,7 @@ class StandardCycleTranscritical(BaseCycle):
         except Exception as e_gc_calc:
             logging.error(f"Failed to calculate condenser state with fixed outlet temperature: {fixed_gas_cooler_outlet_temp} K")
             raise e_gc_calc
-        '''
+
 
         '''
         user_defined_T_gc_outlet_K = None  # Initialize
