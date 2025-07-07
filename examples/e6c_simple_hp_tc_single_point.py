@@ -58,7 +58,7 @@ def calculate_single_point():
     timestamped_save_path = create_timestamped_folder(base_path=base_save_path, prefix="SinglePointRun")
     print(f"Info: Result-folder for this run created: {timestamped_save_path}")
 
-    algorithm = Iteration_TC_COP_Optimizer(raise_errors=True, save_path_plots=timestamped_save_path, show_iteration=True)
+    algorithm = Iteration_TC(raise_errors=True, save_path_plots=timestamped_save_path, show_iteration=True)
     speed_control = RelativeCompressorSpeedControl(0.2, 5.0, 0)
     eva_inputs = HeatExchangerInputs(T_in=0 + 273.15, m_flow=1)
     con_inputs = HeatExchangerInputs(T_in=35 + 273.15, m_flow=1)
@@ -116,8 +116,6 @@ def calculate_single_point():
         except Exception as e:
             print(f"\n--- ERROR: Could not save plot data to CSV. Reason: {e} ---")
 
-        print(f"\nCOP: {fs_state.get('COP').value}")
-
         # plot_cycle(flowsheet.med_prop, flowsheet.get_states_in_order_for_plotting(), show=True)
         print(f"Compressor:")
         print(f"m_flow = {flowsheet.compressor.m_flow * 3600} kg/h")
@@ -133,6 +131,8 @@ def calculate_single_point():
         print(f"m_flow = {flowsheet.evaporator.m_flow * 3600} kg/h")
         print(f"state_inlet = {flowsheet.evaporator.state_inlet}")
         print(f"state_outlet = {flowsheet.evaporator.state_outlet}")
+        print(f"Temperature secondary_inlet = {flowsheet.evaporator.T_in}")
+        print(f"Temperature secondary_outlet = {flowsheet.evaporator.T_out}")
         print(f"COP: {fs_state.get('COP').value}")
     else:
         print(
