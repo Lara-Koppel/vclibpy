@@ -116,10 +116,27 @@ class Algorithm(abc.ABC):
             inputs=inputs, dT_pinch_guess=self.dT_pinch_eva_guess,
             dT_start_guess=self.dT_eva_start_guess
         )
-        p_2_start = flowsheet.get_start_condensing_pressure(
+
+        #p_2_start = 130 * 1e5
+
+        if flowsheet.flowsheet_name == "StandardTranscritical":
+            t_c_estimate_celsius = inputs.condenser.T_in - 273.15 + self.dT_pinch_con_guess
+            t_e_start_celsius = flowsheet.med_prop.calc_state('PQ', p_1_start, 0).T - 273.15
+            p_2_start_bar = ((2.778 - 0.0157 * t_e_start_celsius) * t_c_estimate_celsius + (0.381 * t_e_start_celsius - 9.34))
+
+            p_2_start = p_2_start_bar * 1e5
+
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.info(f"Intelligent start pressure for transcritical cycle calculated: {p_2_start_bar:.2f} bar")
+
+        else:
+            p_2_start = flowsheet.get_start_condensing_pressure(
             inputs=inputs,
             dT_start_guess=self.dT_con_start_guess
-        )
+            )
+
+
         #if self.improve_first_condensing_guess:
         #    p_2_start = self.get_improved_start_condensing_pressure(
         #        inputs=inputs,
