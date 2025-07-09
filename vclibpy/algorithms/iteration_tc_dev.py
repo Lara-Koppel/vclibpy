@@ -162,7 +162,8 @@ class Iteration_TC(Algorithm):
                         p_1=p_1,
                         p_2=p_2,
                         inputs=inputs,
-                        fs_state=fs_state)
+                        fs_state=fs_state
+                    )
                     Q_con = flowsheet.condenser.calc_Q_flow();
                     P_el = flowsheet.calc_electrical_power(fs_state=fs_state, inputs=inputs)
                     current_cop = Q_con / P_el if P_el > 0 else np.nan
@@ -204,33 +205,25 @@ class Iteration_TC(Algorithm):
                     plt.tight_layout(pad=2.0)
                     plt.pause(0.01)
 
-                # --- more robust termination criteria ---
-                is_converged_by_accuracy = abs(error_eva) < 1e-3
-                is_oscillating = i_inner > 0 and np.sign(error_eva) != np.sign(error_eva_history_inner[-1])
-                if is_oscillating: step_p1 = max(step_p1 / 2.0, min_step_p1)
-                is_stuck_at_min_step = step_p1 <= min_step_p1
 
-                gain_1_p1 = 3e5
-                gain_2_p1 = 5e5
-                gain_3_p1 = 5e5
                 error_eva_abs = abs(error_eva)
 
-                if error_eva_abs < 1:
-                    step_p1 = (error_eva_abs / 100) * gain_3_p1
+                gain_1_p1 = 5e5
+                gain_2_p1 = 3e5
+
+                if error_eva_abs > 10:
+                    step_p1 = abs(error_eva_abs / 100) * gain_2_p1
                 elif error_eva_abs < 10:
-                    step_p1 = (error_eva_abs / 100) * gain_2_p1
-                else:
-                    step_p1 = (error_eva_abs / 100) * gain_1_p1
+                    step_p1 = abs(error_eva_abs / 100) * gain_1_p1
 
                 step_p1 = np.clip(step_p1, min_step_p1, self.step_max)
 
-                if abs(error_eva) < 1e-3 or step_p1 <= min_step_p1:
+                if abs(error_eva) < 1e-3 or (i_inner > 0 and step_p1 <= min_step_p1):
                     logger.info(
                         f"Inner loop converged for p_2={p_2 * 1e-5:.2f} bar after {i_inner + 1} steps. Final p_1={p_1 * 1e-5:.2f} bar.")
                     p_1_stable = True
-                    break
+                    break  # Schleife hier verlassen
 
-                error_eva_history_inner.append(error_eva)
                 p_1 += np.sign(error_eva) * step_p1
 
             if not p_1_stable:
@@ -279,7 +272,7 @@ class Iteration_TC(Algorithm):
 
             final_cop_for_this_p2 = cop_history[-1] if cop_history else np.nan
 
-            ''''
+            '''
             min_pinch_spec = 3.0
             if dT_min_con < min_pinch_spec:
                 final_cop_for_this_p2 = -1.0
@@ -302,14 +295,10 @@ class Iteration_TC(Algorithm):
                     delta_p2) > 1e-9 else 0
                 differential_history.append(local_differential)
 
-                cop_has_dropped = final_cop_for_this_p2 < (best_cop - 1e-4)
-                sign_has_flipped = len(differential_history) > 1 and np.sign(differential_history[-1]) != np.sign(
-                    differential_history[-2])
-
-                if cop_has_dropped or sign_has_flipped:
-                    # --- Hier folgt unsere bekannte und bewährte "Zurückspringen"-Logik ---
+                if len(differential_history) > 1 and np.sign(differential_history[-1]) != np.sign(
+                        differential_history[-2]):
                     logger.info(
-                        f"Optimum überschritten (COP dropped or sign flipped). Springe zu bestem Zustand (p1={best_p1 / 1e5:.2f}, p2={best_p2 / 1e5:.2f}) zurück.")
+                        f"Optimum überschritten. Springe zu bestem p2={best_p2 / 1e5:.2f} bar zurück und verfeinere Suche.")
 
                     p_2 = best_p2
                     p_1 = best_p1
@@ -318,10 +307,9 @@ class Iteration_TC(Algorithm):
                     step_p2_bar = max(step_p2_bar / 3, min_step_p2_bar)
 
                     # Setze den 'letzten' Zustand zurück, um falsche Berechnungen zu vermeiden
-                    last_converged_cop = np.nan
-                    last_p2_bar = np.nan
+                    last_converged_cop = best_cop
+                    last_p2_bar = best_p2 / 1e5
                     differential_history.clear()  # Historie leeren für sauberen Neustart der Feinsuche
-                    continue
 
                 if step_p2_bar <= min_step_p2_bar:
 
