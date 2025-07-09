@@ -202,7 +202,7 @@ class StandardCycleTranscritical(BaseCycle):
         except Exception as e:
             raise ValueError("fsolve_condenser_did_not_converge") from e
 
-        '''
+
         # iterate the condenser outlet temperature based on energy balance
         max_err_q = 0.5
         error_history = []
@@ -237,11 +237,11 @@ class StandardCycleTranscritical(BaseCycle):
                 self.condenser.state_outlet = self.set_condenser_outlet_based_on_pinch_point(p_2=p_2, inputs=inputs, pinch_point=pinch_point)
             else:
                 break
+
+
         '''
-
-
         # This is an alternative to the above iteration, which sets a fixed gas cooler outlet temperature
-        fixed_gas_cooler_outlet_temp = 40 + 273.15
+        fixed_gas_cooler_outlet_temp = 36.4 + 273.15
 
         try:
             self.condenser.state_outlet = self.med_prop.calc_state("PT", p_2, fixed_gas_cooler_outlet_temp)
@@ -256,47 +256,6 @@ class StandardCycleTranscritical(BaseCycle):
         except Exception as e_gc_calc:
             logging.error(f"Failed to calculate condenser state with fixed outlet temperature: {fixed_gas_cooler_outlet_temp} K")
             raise e_gc_calc
-
-
-        '''
-        user_defined_T_gc_outlet_K = None  # Initialize
-        if hasattr(self, 'user_defined_fixed_T_gc_outlet_K') and self.user_defined_fixed_T_gc_outlet_K is not None:
-            user_defined_T_gc_outlet_K = self.user_defined_fixed_T_gc_outlet_K
-            logging.info(
-                f"Using user-defined fixed GC outlet temperature from example script: "
-                f"{user_defined_T_gc_outlet_K - 273.15:.2f}°C at p={p_2 / 1e5:.2f}bar"
-            )
-        else:
-            # If no temperature was set in the example script, use a hardcoded default here
-            # OR raise an error to remind the user to set it in the example script.
-            # For now, using a default and issuing a warning.
-            user_defined_T_gc_outlet_K = 40 + 273.15  # Default to 40°C, for example
-            logging.warning(
-                f"No user-defined fixed GC outlet temperature set in example script! "
-                f"Using internal default: {user_defined_T_gc_outlet_K - 273.15:.2f}°C"
-            )
-
-        try:
-            self.condenser.state_outlet = self.med_prop.calc_state("PT", p_2, user_defined_T_gc_outlet_K)
-        except Exception as e_gc_fixed:
-            logging.error(
-                f"Error setting fixed GC outlet to "
-                f"{user_defined_T_gc_outlet_K - 273.15:.2f}°C: {e_gc_fixed}"
-            )
-            raise  # Re-raise the exception
-
-        try:
-            # Important: Call self.condenser.calc() once to update Q_con, secondary side temps, etc.
-            # The returned 'error' and 'dT_min' are not used for iteration here.
-            error, dT_min = self.condenser.calc(inputs=inputs, fs_state=fs_state)
-            logging.info(
-                f"GC calculation with fixed outlet: error={error:.2f}%, dT_min={dT_min:.2f}K"
-            )
-        except Exception as e_gc_calc:
-            logging.error(
-                f"Error during self.condenser.calc() with fixed outlet: {e_gc_calc}"
-            )
-            raise  # Re-raise the exception
         '''
 
         self.expansion_valve.state_inlet = self.condenser.state_outlet
