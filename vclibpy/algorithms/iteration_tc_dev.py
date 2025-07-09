@@ -30,7 +30,7 @@ class Iteration_TC(Algorithm):
         self.use_quick_solver = kwargs.pop("use_quick_solver", True)
         self.max_err_dT_min = kwargs.pop("min_allowed_dT_min", 0.01)
         self.max_num_iterations = kwargs.pop("max_num_iterations", int(1e5))
-        self.step_max = kwargs.pop("step_max", 10000)
+        self.step_max = kwargs.pop("step_max", 500000)
         self.return_least_error_if_max_reached = kwargs.pop("return_least_error_if_max_reached", False)
         super().__init__(**kwargs)
 
@@ -98,6 +98,9 @@ class Iteration_TC(Algorithm):
         p_2 = p_2_start
         step_p2_bar = 5.0
         min_step_p2_bar = 0.1
+        best_cop = -np.inf
+        best_p2 = np.nan
+        best_p1 = np.nan
 
         # History-Listen
         p_1_history, p_2_history, cop_history, error_eva_history, error_con_history, dT_eva_history, dT_con_history, differential_history = ([] for _ in range(8))
@@ -149,24 +152,26 @@ class Iteration_TC(Algorithm):
                 return None
 
             p_1_stable = False
-            step_p1 = 1e4
+            step_p1 = self.step_max
             min_step_p1 = 10
             error_eva_history_inner = [np.nan]
 
             for i_inner in range(100):
                 try:
-                    error_eva, dT_min_eva, error_con, dT_min_con = flowsheet.calculate_cycle_for_pressures(p_1=p_1,
-                                                                                                           p_2=p_2,
-                                                                                                           inputs=inputs,
-                                                                                                           fs_state=fs_state)
+                    error_eva, dT_min_eva, error_con, dT_min_con = flowsheet.calculate_cycle_for_pressures(
+                        p_1=p_1,
+                        p_2=p_2,
+                        inputs=inputs,
+                        fs_state=fs_state)
                     Q_con = flowsheet.condenser.calc_Q_flow();
                     P_el = flowsheet.calc_electrical_power(fs_state=fs_state, inputs=inputs)
                     current_cop = Q_con / P_el if P_el > 0 else np.nan
+
                 except Exception:
                     p_1 += min_step_p1
                     continue
 
-                # Datensammlung bei JEDEM inneren Schritt
+
                 current_values = [p_1 * 1e-5, p_2 * 1e-5, current_cop, error_eva, error_con, dT_min_eva, dT_min_con]
                 all_histories = [p_1_history, p_2_history, cop_history, error_eva_history, error_con_history, dT_eva_history,
                                  dT_con_history]
@@ -205,7 +210,21 @@ class Iteration_TC(Algorithm):
                 if is_oscillating: step_p1 = max(step_p1 / 2.0, min_step_p1)
                 is_stuck_at_min_step = step_p1 <= min_step_p1
 
-                if is_converged_by_accuracy or (is_oscillating and is_stuck_at_min_step):
+                gain_1_p1 = 3e5
+                gain_2_p1 = 5e5
+                gain_3_p1 = 5e5
+                error_eva_abs = abs(error_eva)
+
+                if error_eva_abs < 1:
+                    step_p1 = (error_eva_abs / 100) * gain_3_p1
+                elif error_eva_abs < 10:
+                    step_p1 = (error_eva_abs / 100) * gain_2_p1
+                else:
+                    step_p1 = (error_eva_abs / 100) * gain_1_p1
+
+                step_p1 = np.clip(step_p1, min_step_p1, self.step_max)
+
+                if abs(error_eva) < 1e-3 or step_p1 <= min_step_p1:
                     logger.info(
                         f"Inner loop converged for p_2={p_2 * 1e-5:.2f} bar after {i_inner + 1} steps. Final p_1={p_1 * 1e-5:.2f} bar.")
                     p_1_stable = True
@@ -243,6 +262,12 @@ class Iteration_TC(Algorithm):
 
 
             final_cop_for_this_p2 = cop_history[-1] if cop_history else np.nan
+
+            if final_cop_for_this_p2 > best_cop:
+                best_cop = final_cop_for_this_p2
+                best_p2 = p_2
+                best_p1 = p_1
+
             final_error_con_for_this_p2 = error_con_history[-1] if error_con_history else np.nan
 
 
@@ -254,9 +279,11 @@ class Iteration_TC(Algorithm):
 
             final_cop_for_this_p2 = cop_history[-1] if cop_history else np.nan
 
+            ''''
             min_pinch_spec = 3.0
             if dT_min_con < min_pinch_spec:
                 final_cop_for_this_p2 = -1.0
+            '''
 
             warning_zone_pressure = p_2_min_limit + 2e5
             if p_2 < warning_zone_pressure:
@@ -275,9 +302,26 @@ class Iteration_TC(Algorithm):
                     delta_p2) > 1e-9 else 0
                 differential_history.append(local_differential)
 
-                if len(differential_history) > 1 and np.sign(differential_history[-1]) != np.sign(
-                        differential_history[-2]):
+                cop_has_dropped = final_cop_for_this_p2 < (best_cop - 1e-4)
+                sign_has_flipped = len(differential_history) > 1 and np.sign(differential_history[-1]) != np.sign(
+                    differential_history[-2])
+
+                if cop_has_dropped or sign_has_flipped:
+                    # --- Hier folgt unsere bekannte und bewährte "Zurückspringen"-Logik ---
+                    logger.info(
+                        f"Optimum überschritten (COP dropped or sign flipped). Springe zu bestem Zustand (p1={best_p1 / 1e5:.2f}, p2={best_p2 / 1e5:.2f}) zurück.")
+
+                    p_2 = best_p2
+                    p_1 = best_p1
+
+                    # Schrittweite reduzieren für die Feinsuche
                     step_p2_bar = max(step_p2_bar / 3, min_step_p2_bar)
+
+                    # Setze den 'letzten' Zustand zurück, um falsche Berechnungen zu vermeiden
+                    last_converged_cop = np.nan
+                    last_p2_bar = np.nan
+                    differential_history.clear()  # Historie leeren für sauberen Neustart der Feinsuche
+                    continue
 
                 if step_p2_bar <= min_step_p2_bar:
 
