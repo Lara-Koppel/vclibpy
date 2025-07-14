@@ -1,6 +1,7 @@
 def calculate_single_point():
     import os
     import pandas as pd
+    import time
     from vclibpy.flowsheets import StandardCycleTranscritical
     from vclibpy.components.heat_exchangers import moving_boundary_ntu
     from vclibpy.components.heat_exchangers import heat_transfer
@@ -61,14 +62,29 @@ def calculate_single_point():
     algorithm = Iteration_TC(raise_errors=True, save_path_plots=timestamped_save_path, show_iteration=True)
     speed_control = RelativeCompressorSpeedControl(0.2, 5.0, 0)
     eva_inputs = HeatExchangerInputs(T_in=0 + 273.15, m_flow=1)
-    con_inputs = HeatExchangerInputs(T_in=35 + 273.15, m_flow=1)
+    con_inputs = HeatExchangerInputs(T_in=32 + 273.15, m_flow=1)
     inputs = Inputs(control=speed_control, evaporator=eva_inputs, condenser=con_inputs)
+
+    start_time = time.perf_counter()
 
 
     fs_state = algorithm.calc_steady_state(flowsheet, inputs, "CarbonDioxide")
-    #plot_cycle(flowsheet.med_prop, flowsheet.get_states_in_order_for_plotting(), show=True)
+
+    end_zeit = time.perf_counter()
+    duration_seconds = end_zeit - start_time
+
+    # Following code is for output and csv export of the results
     if fs_state is not None:
         print("\n--- Calculation successful! Results: ---")
+
+        print(f"\nRuntime of code: {duration_seconds:.4f} seconds")
+        try:
+            laufzeit_datei_pfad = os.path.join(timestamped_save_path, "laufzeit.txt")
+            with open(laufzeit_datei_pfad, "w") as f:
+                f.write(f"Runtime in seconds: {duration_seconds}\n")
+            print(f"Laufzeit erfolgreich gespeichert in: {laufzeit_datei_pfad}")
+        except Exception as e:
+            print(f"Fehler beim Speichern der Laufzeit: {e}")
 
         try:
             print("\n--- Saving plot data (including secondary side) to CSV ---")
@@ -88,25 +104,17 @@ def calculate_single_point():
             for i in range(split_idx):
                 all_plot_points.append({'label': 'sat_liquid', 'h_kJ_kg': h_sat[i] / 1000, 'T_C': T_sat[i] - 273.15,
                                         'p_bar': p_sat[i] / 1e5})
-
             for i in range(split_idx, len(h_sat)):
                 all_plot_points.append({'label': 'sat_vapor', 'h_kJ_kg': h_sat[i] / 1000, 'T_C': T_sat[i] - 273.15,
                                         'p_bar': p_sat[i] / 1e5})
-
-
             all_plot_points.append({'label': 'sec_condenser', 'h_kJ_kg': flowsheet.condenser.state_outlet.h / 1000,
                                     'T_C': flowsheet.condenser.T_in - 273.15, 'p_bar': None})
-
             all_plot_points.append({'label': 'sec_condenser', 'h_kJ_kg': flowsheet.condenser.state_inlet.h / 1000,
                                     'T_C': flowsheet.condenser.T_out - 273.15, 'p_bar': None})
-
-
             all_plot_points.append({'label': 'sec_evaporator', 'h_kJ_kg': flowsheet.evaporator.state_outlet.h / 1000,
                                     'T_C': flowsheet.evaporator.T_in - 273.15, 'p_bar': None})
-
             all_plot_points.append({'label': 'sec_evaporator', 'h_kJ_kg': flowsheet.evaporator.state_inlet.h / 1000,
                                     'T_C': flowsheet.evaporator.T_out - 273.15, 'p_bar': None})
-
 
             df_plot = pd.DataFrame(all_plot_points)
             csv_path = os.path.join(timestamped_save_path, "final_plot_data_full.csv")
