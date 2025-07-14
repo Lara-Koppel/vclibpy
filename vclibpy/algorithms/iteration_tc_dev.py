@@ -315,7 +315,22 @@ class Iteration_TC(Algorithm):
 
                     logger.info("Outer loop converged: p_2 step size is below tolerance.")
 
+                    final_state = flowsheet.calculate_outputs_for_valid_pressures(
+                        p_1=p_1,
+                        p_2=p_2,
+                        inputs=inputs,
+                        fs_state=fs_state,
+                        save_path_plots=self.save_path_plots
+                    )
+
                     if self.save_path_plots:
+                        p_1_history.append(p_1 / 1e5)
+                        p_2_history.append(p_2 / 1e5)
+                        error_con_history.append(error_con)
+                        error_eva_history.append(error_eva)
+                        dT_con_history.append(dT_min_con)
+                        dT_eva_history.append(dT_min_eva)
+                        cop_history.append(best_cop)
                         df_history = pd.DataFrame({
                             "p_1": p_1_history, "p_2": p_2_history, "error_con": error_con_history,
                             "error_eva": error_eva_history, "dT_con": dT_con_history, "dT_eva": dT_eva_history,
@@ -335,13 +350,7 @@ class Iteration_TC(Algorithm):
                     fs_state.set(name="converged", value=1, unit="-")
 
 
-                    return flowsheet.calculate_outputs_for_valid_pressures(
-                        p_1=p_1,
-                        p_2=p_2,
-                        inputs=inputs,
-                        fs_state=fs_state,
-                        save_path_plots=self.save_path_plots
-                    )
+                    return final_state
 
                 p_2 += np.sign(
                     local_differential) * step_p2_bar * 1e5 if local_differential != 0 else -step_p2_bar * 1e5
@@ -350,61 +359,6 @@ class Iteration_TC(Algorithm):
 
             last_converged_cop = final_cop_for_this_p2
             last_p2_bar = p2_bar_current
-
-            '''
-            # To be commented out if fixed pinch point calculation is used
-            # final_cop_for_this_p2 = cop_history[-1]
-            p2_bar_current = p_2 * 1e-5
-            if not np.isnan(last_p2_bar):
-                delta_p2 = p2_bar_current - last_p2_bar
-                local_differential = (final_cop_for_this_p2 - last_converged_cop) / delta_p2 if abs(
-                    delta_p2) > 1e-9 else 0
-                differential_history.append(local_differential)
-
-                if len(differential_history) > 1 and np.sign(differential_history[-1]) != np.sign(
-                        differential_history[-2]):
-                    step_p2_bar = max(step_p2_bar / 3, min_step_p2_bar)
-
-                if step_p2_bar <= min_step_p2_bar:
-                    logger.info("Outer loop converged: p_2 step size is below tolerance.")
-
-                    # NEU: DataFrame erstellen und als Excel/CSV speichern
-                    if self.save_path_plots:
-                        # Erstelle das DataFrame aus den kompletten Listen
-                        df_history = pd.DataFrame({
-                            "p_1": p_1_history,
-                            "p_2": p_2_history,
-                            "error_con": error_con_history,
-                            "error_eva": error_eva_history,
-                            "dT_con": dT_con_history,
-                            "dT_eva": dT_eva_history,
-                            "cop": cop_history,
-                        })
-                        # Speichere die Datei (z.B. als CSV mit Semikolon)
-                        filepath = self.save_path_plots.joinpath(f"{inputs.get_name()}_TC_history.csv")
-                        df_history.to_csv(filepath, sep=';', decimal=',', index_label="Iteration")
-                        logger.info(f"Complete iteration history saved to {filepath}")
-
-                    if self.show_iteration:
-                        if self.save_path_plots:
-                            fig_iterations.savefig(
-                                self.save_path_plots.joinpath(f"{inputs.get_name()}_convergence_plot_SUCCESS.png"))
-                        plt.close(fig_iterations)
-
-                    flowsheet.iteration_converged = True
-                    fs_state.set(name="converged", value=1, unit="-")
-                    return flowsheet.calculate_outputs_for_valid_pressures(p_1=p_1, p_2=p_2, inputs=inputs,
-                                                                           fs_state=fs_state,
-                                                                           save_path_plots=self.save_path_plots)
-
-                p_2 += np.sign(
-                    local_differential) * step_p2_bar * 1e5 if local_differential != 0 else -step_p2_bar * 1e5
-            else:
-                p_2 -= step_p2_bar * 1e5
-
-            last_converged_cop = final_cop_for_this_p2
-            last_p2_bar = p2_bar_current
-            '''
 
         logger.warning("Breaking: Max outer iterations reached.")
         if self.show_iteration and self.save_path_plots:
