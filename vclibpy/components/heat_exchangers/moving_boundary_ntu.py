@@ -160,90 +160,113 @@ class MovingBoundaryNTUGasCooler(ExternalHeatExchanger):
     """
 
     def calc(self, inputs: Inputs, fs_state: FlowsheetState) -> (float, float):
-        """
-        Calculate the heat exchanger with the NTU-Method based on the given inputs.
 
-        The flowsheet state can be used to save important variables
-        during calculation for later analysis.
-
-        Both return values are used to check if the heat transfer is valid or not.
-
-        Args:
-            inputs (Inputs): The inputs for the calculation.
-            fs_state (FlowsheetState): The flowsheet state to save important variables.
-
-        Returns:
-            Tuple[float, float]:
-                error: Error in percentage between the required and calculated heat flow rates.
-                dT_min: Minimal temperature difference (can be negative).
-        """
         self.m_flow_secondary = inputs.condenser.m_flow  # [kg/s]
 
         Q = (self.state_inlet.h - self.state_outlet.h) * self.m_flow
+        if np.isclose(Q, 0):
+            return 0.0, self.state_inlet.T - self.T_out
         # Get secondary medium inlet and outlet temperatures
-        T_in, T_out = get_gas_cooler_phase_temperatures(
-            inputs=inputs,
-            Q=Q,
-            heat_exchanger=self
-        )
+        T_in, T_out = get_gas_cooler_phase_temperatures(inputs=inputs, Q=Q, heat_exchanger=self)
         self.T_in = T_in
         self.T_out = T_out
 
+        try:
+            steps = 20
+            h_steps = np.linspace(self.state_inlet.h, self.state_outlet.h, steps+1)
+            T_sec_steps = np.linspace(T_in, T_out, steps + 1)
+            T_ref_steps = [self.med_prop.calc_state("PH", self.state_inlet.p, h).T for h in h_steps]
+        except ValueError:
+            return 1e6, -100
+
+        temp_diffs = np.array(T_ref_steps) - np.array(T_sec_steps[::-1])
+        dT_min = np.min(temp_diffs)
+
+        if dT_min < 0:
+            return abs(dT_min) * 1e4, dT_min
+
+        # inter_states = [self.med_prop.calc_state("PH", self.state_inlet.p, h_val) for h_val in h_steps]
+        Q_ntu, A_used = 0, 0
         tra_prop_med = self.calc_transport_properties_secondary_medium((T_in + T_out) / 2)
         alpha_med_wall = self.calc_alpha_secondary(tra_prop_med)
 
-        steps = 20
-        h_steps = np.linspace(self.state_inlet.h, self.state_outlet.h, steps+1)
-        inter_states = [self.med_prop.calc_state("PH", self.state_inlet.p, h_val) for h_val in h_steps]
-        Q_ntu, A_used = 0, 0
-        for i in range(steps-1):
-            primary_cp = ((inter_states[i].h - inter_states[i+1].h) / (inter_states[i].T - inter_states[i+1].T))
-            # Get transport properties:
-            tra_prop_ref_con = self.med_prop.calc_mean_transport_properties(inter_states[i], inter_states[i+1])
-            alpha_ref_wall = self.calc_alpha_liquid(tra_prop_ref_con)
+        for i in range(steps):
+            state_in_seg = self.med_prop.calc_state("PH", self.state_inlet.p, h_steps[i])
+            state_out_seg = self.med_prop.calc_state("PH", self.state_inlet.p, h_steps[i + 1])
+            T_ref_in_seg = T_ref_steps[i]
+            T_sec_out_seg = T_sec_steps[i + 1]
+            dT_max_seg = T_ref_in_seg - T_sec_out_seg
 
-            # Only use still available area:
+            if not np.isclose(state_in_seg.T, state_out_seg.T):
+                primary_cp = (state_in_seg.h - state_out_seg.h) / (state_in_seg.T - state_out_seg.T)
+            else:
+                primary_cp = np.inf
+
+            tra_prop_ref_con = self.med_prop.calc_mean_transport_properties(state_in_seg, state_out_seg)
+            alpha_ref_wall = self.calc_alpha_gas(tra_prop_ref_con)
             k = self.calc_k(alpha_pri=alpha_ref_wall, alpha_sec=alpha_med_wall)
-            Q_ntu_step, A_used_step = ntu.calc_Q_with_available_area(
+            Q_required_seg = (state_in_seg.h - state_out_seg.h) * self.m_flow
+
+            _, A_used_step = ntu.calc_Q_with_available_area(
                 heat_exchanger=self,
                 m_flow_primary_cp=self.m_flow * primary_cp,
                 m_flow_secondary_cp=self.m_flow_secondary_cp,
-                Q_required=Q/steps,
+                Q_required=Q_required_seg,
                 k=k,
-                dT_max=(inter_states[i].T - (T_in+(T_out-T_in)/steps*(steps-(i+1)))),
-                A_available=self.A-A_used
+                dT_max=dT_max_seg,
+                A_available=(self.A - A_used)
             )
+
+            if A_used + A_used_step >= self.A or i == steps - 1:
+                A_used_step = max(0, self.A - A_used)
+                Q_ntu_step = ntu.calc_Q_ntu(
+                    m_flow_primary_cp=self.m_flow * primary_cp,
+                    m_flow_secondary_cp=self.m_flow_secondary_cp,
+                    k=k,
+                    dT_max=dT_max_seg,
+                    A=A_used_step,
+                    flow_type=self.flow_type
+                )
+            else:
+                Q_ntu_step = Q_required_seg
+
             A_used += A_used_step
             Q_ntu += Q_ntu_step
-            # print(f"A_used: {A_used}, Q_ntu: {Q_ntu}, dT_max: {inter_states[i].T - (T_in+((T_out-T_in)/steps)*(steps-(i+1)))}, Q_required: {Q/steps}, A_used_step: {A_used_step}, Q_ntu_step: {Q_ntu_step}")
-
-        primary_cp = ((inter_states[steps-1].h - inter_states[steps].h) / (inter_states[steps-1].T - inter_states[steps].T))
-        # Get transport properties:
-        tra_prop_ref_con = self.med_prop.calc_mean_transport_properties(inter_states[steps-1], inter_states[steps])
-        alpha_ref_wall = self.calc_alpha_liquid(tra_prop_ref_con)
-
-        # Only use still available area:
-        k = self.calc_k(alpha_pri=alpha_ref_wall, alpha_sec=alpha_med_wall)
-        Q_ntu_step = ntu.calc_Q_ntu(
-            m_flow_primary_cp=self.m_flow * primary_cp,
-            m_flow_secondary_cp=self.m_flow_secondary_cp,
-            k=k,
-            dT_max=(inter_states[steps-1].T - T_in),
-            A=self.A-A_used,
-            flow_type=self.flow_type
-        )
-        A_used = self.A
-        Q_ntu += Q_ntu_step
-        # print(f"A_used: {A_used}, Q_ntu: {Q_ntu}, dT_max: {inter_states[i].T - (T_in + ((T_out - T_in) / steps) * (steps - (i + 1)))}, Q_required: {Q / steps}, Q_ntu_step: {Q_ntu_step}")
-
 
         error = (Q_ntu / Q - 1) * 100
-        # Get dT_min
-        dT_min_in = self.state_outlet.T - T_in
-        dT_min_out = self.state_inlet.T - T_out    #ToDO: dT_min can also be in the middle of the gas cooler (where dT/dh_secondary*m_flow_secondary = dT/dh_primary*m_flow_primary)
-        cp_secondary = tra_prop_med.cp
+        return error, dT_min
 
-        return error, min(dT_min_out, dT_min_in)#, Q_ntu, Q
+    def pinch_point_analysis(self):
+        """
+        Perform a pinch point analysis for the gas cooler.
+        """
+        try:
+            steps = 20
+            h_steps = np.linspace(self.state_inlet.h, self.state_outlet.h, steps + 1)
+            T_sec_steps = np.linspace(self.T_in, self.T_out, steps + 1)
+            T_ref_steps = [self.med_prop.calc_state("PH", self.state_inlet.p, h).T for h in h_steps]
+
+            temp_diffs = np.array(T_ref_steps) - np.array(T_sec_steps[::-1])
+            dT_min = np.min(temp_diffs)
+            pinch_index = np.argmin(temp_diffs)
+            pinch_enthalpy = h_steps[pinch_index]
+
+            if pinch_index == 0:
+                location_desc = "Gas cooler inlet (hot end)"
+            elif pinch_index == steps:
+                location_desc = "Gas cooler outlet (cold end)"
+            else:
+                pinch_position_percent = (pinch_index / steps) * 100
+                location_desc = f"Inside gas cooler at approx. {pinch_position_percent:.2f}% of heat exchange"
+
+            return (
+                f" Pinch point location: {location_desc}\n"
+                f" Pinch enthalpy: {pinch_enthalpy / 1000:.2f} kJ/kg\n"
+                f" Final dT_min: {dT_min:.2f} K"
+            )
+        except Exception as e:
+            return f"Error during pinch point analysis: {str(e)}"
+
 
 class MovingBoundaryNTUEvaporator(ExternalHeatExchanger):
     """
