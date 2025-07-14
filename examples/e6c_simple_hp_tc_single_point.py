@@ -34,7 +34,7 @@ def calculate_single_point():
 
     from vclibpy.components.compressors import RotaryCompressor
     compressor = RotaryCompressor(
-        N_max=125,
+        N_max=95,
         V_h=19e-6
     )
 
@@ -62,7 +62,7 @@ def calculate_single_point():
     algorithm = Iteration_TC(raise_errors=True, save_path_plots=timestamped_save_path, show_iteration=True)
     speed_control = RelativeCompressorSpeedControl(0.2, 5.0, 0)
     eva_inputs = HeatExchangerInputs(T_in=0 + 273.15, m_flow=1)
-    con_inputs = HeatExchangerInputs(T_in=32 + 273.15, m_flow=1)
+    con_inputs = HeatExchangerInputs(T_in=40 + 273.15, m_flow=0.5)
     inputs = Inputs(control=speed_control, evaporator=eva_inputs, condenser=con_inputs)
 
     start_time = time.perf_counter()
@@ -79,12 +79,12 @@ def calculate_single_point():
 
         print(f"\nRuntime of code: {duration_seconds:.4f} seconds")
         try:
-            laufzeit_datei_pfad = os.path.join(timestamped_save_path, "laufzeit.txt")
-            with open(laufzeit_datei_pfad, "w") as f:
+            runtime_save_path = os.path.join(timestamped_save_path, "runtime.txt")
+            with open(runtime_save_path, "w") as f:
                 f.write(f"Runtime in seconds: {duration_seconds}\n")
-            print(f"Laufzeit erfolgreich gespeichert in: {laufzeit_datei_pfad}")
+            print(f"Runtime successfully saved in: {runtime_save_path}")
         except Exception as e:
-            print(f"Fehler beim Speichern der Laufzeit: {e}")
+            print(f"Error while saving the runtime: {e}")
 
         try:
             print("\n--- Saving plot data (including secondary side) to CSV ---")
@@ -125,26 +125,94 @@ def calculate_single_point():
             print(f"\n--- ERROR: Could not save plot data to CSV. Reason: {e} ---")
 
         # plot_cycle(flowsheet.med_prop, flowsheet.get_states_in_order_for_plotting(), show=True)
-        print(f"Compressor:")
-        print(f"m_flow = {flowsheet.compressor.m_flow * 3600} kg/h")
-        print(f"state_inlet = {flowsheet.compressor.state_inlet}")
-        print(f"state_outlet = {flowsheet.compressor.state_outlet}")
-        print(f"Condenser:")
-        print(f"m_flow = {flowsheet.condenser.m_flow * 3600} kg/h")
-        print(f"state_inlet = {flowsheet.condenser.state_inlet}")
-        print(f"state_outlet = {flowsheet.condenser.state_outlet}")
-        print(f"Temperature secondary_inlet = {flowsheet.condenser.T_in}")
-        print(f"Temperature secondary_outlet = {flowsheet.condenser.T_out}")
-        print(f"Evaporator:")
-        print(f"m_flow = {flowsheet.evaporator.m_flow * 3600} kg/h")
-        print(f"state_inlet = {flowsheet.evaporator.state_inlet}")
-        print(f"state_outlet = {flowsheet.evaporator.state_outlet}")
-        print(f"Temperature secondary_inlet = {flowsheet.evaporator.T_in}")
-        print(f"Temperature secondary_outlet = {flowsheet.evaporator.T_out}")
+        print(f"Compressor:\n"
+              f"m_flow = {flowsheet.compressor.m_flow * 3600} kg/h\n"
+              f"state_inlet = {flowsheet.compressor.state_inlet}\n"
+              f"state_outlet = {flowsheet.compressor.state_outlet}\n"
+              )
+        print(f"Evaporator:\n"
+              f"m_flow = {flowsheet.evaporator.m_flow * 3600} kg/h\n"
+              f"state_inlet = {flowsheet.evaporator.state_inlet}\n"
+              f"state_outlet = {flowsheet.evaporator.state_outlet}\n"
+              f"Temperature secondary_inlet = {flowsheet.evaporator.T_in}\n"
+              f"Temperature secondary_outlet = {flowsheet.evaporator.T_out}\n"
+              )
+        print(f"Condenser:\n"
+              f"m_flow = {flowsheet.condenser.m_flow * 3600} kg/h\n"
+              f"state_inlet = {flowsheet.condenser.state_inlet}\n"
+              f"state_outlet = {flowsheet.condenser.state_outlet}\n"
+              f"Temperature secondary_inlet = {flowsheet.condenser.T_in}\n"
+              f"Temperature secondary_outlet = {flowsheet.condenser.T_out}\n"
+              )
         print(f"COP: {fs_state.get('COP').value}")
+        print(f"{flowsheet.condenser.pinch_point_analysis()}")
     else:
         print(
             "\n--- Calculation NOT successfull. Algorithm couldn't find a solution for given Inputs. ---")
 
+
+def test_gas_cooler():
+    import numpy as np
+    import matplotlib.pyplot as plt
+    from vclibpy.components.heat_exchangers import moving_boundary_ntu
+    from vclibpy.components.heat_exchangers import heat_transfer
+    from vclibpy.media import CoolProp
+
+    """
+    Isolierter Test für den MovingBoundaryNTUGasCooler, um einen
+    internen Pinch-Punkt gezielt zu erzeugen und zu analysieren.
+    """
+    print("--- Starte isolierten Gaskühler-Test ---")
+
+    # 1. Komponente und Stoffdaten initialisieren
+    condenser = moving_boundary_ntu.MovingBoundaryNTUGasCooler(
+        A=80, secondary_medium="air", flow_type="counter",
+        ratio_outer_to_inner_area=10,
+        gas_heat_transfer=heat_transfer.constant.ConstantHeatTransfer(alpha=1000),
+        wall_heat_transfer=heat_transfer.wall.WallTransfer(lambda_=236, thickness=2e-3),
+        liquid_heat_transfer=heat_transfer.constant.ConstantHeatTransfer(alpha=5000),
+        secondary_heat_transfer=heat_transfer.constant.ConstantHeatTransfer(alpha=25),
+        two_phase_heat_transfer=heat_transfer.constant.ConstantTwoPhaseHeatTransfer(alpha=1000)  # Hinzugefügt
+    )
+    med_prop = CoolProp(fluid_name="CO2")
+    condenser.med_prop = med_prop
+    condenser.start_secondary_med_prop()
+
+    # 2. Gezielt einen Fall mit internem Pinch definieren
+    p2_bar = 97.78  # Druck nahe am kritischen Punkt, um "Bauch" zu erzeugen
+
+    # Kältemittel-Zustände manuell setzen
+    condenser.state_inlet = med_prop.calc_state("PT", p2_bar * 1e5, 120 + 273.15)
+    condenser.state_outlet = med_prop.calc_state("PT", p2_bar * 1e5, 30 + 273.15)
+    condenser.m_flow = 0.1  # Beispiel-Massenstrom
+
+    # Sekundärmedium-Temperaturen so wählen, dass sie den "Bauch" schneiden
+    condenser.T_in = 32 + 273.15  # Kaltes Ende
+    condenser.T_out = 41.54 + 273.15  # Heißes Ende
+
+    # 3. Die Analyse-Methode direkt aufrufen
+    pinch_details = condenser.pinch_point_analysis()
+
+    # 4. Ergebnisse ausgeben
+    print("\n--- Analyse-Ergebnis ---")
+    print(pinch_details)
+
+    # 5. Visuelle Überprüfung mit einem T-h-Diagramm
+    steps = 20
+    h_steps = np.linspace(condenser.state_inlet.h, condenser.state_outlet.h, steps + 1)
+    T_ref_steps = [med_prop.calc_state("PH", condenser.state_inlet.p, h).T for h in h_steps]
+    T_sec_steps = np.linspace(condenser.T_in, condenser.T_out, steps + 1)
+
+    plt.figure(figsize=(10, 6))
+    plt.plot(np.array(h_steps) / 1000, np.array(T_ref_steps) - 273.15, 'r-', label='CO2 (Primärmedium)')
+    plt.plot(np.array(h_steps) / 1000, np.array(T_sec_steps[::-1]) - 273.15, 'b-', label='Luft (Sekundärmedium)')
+    plt.xlabel("Enthalpie h [kJ/kg]")
+    plt.ylabel("Temperatur T [°C]")
+    plt.title(f"T-h Diagramm für p = {p2_bar} bar")
+    plt.legend()
+    plt.grid(True)
+    plt.show()
+
 if __name__ == "__main__":
     calculate_single_point()
+    # test_gas_cooler()
