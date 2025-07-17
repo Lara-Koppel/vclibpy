@@ -13,6 +13,7 @@ except ImportError:
 from vclibpy import Inputs, FlowsheetState
 from vclibpy.algorithms.base import Algorithm
 from vclibpy.flowsheets import BaseCycle
+from scipy.optimize import brentq
 
 logger = logging.getLogger(__name__)
 
@@ -94,6 +95,19 @@ class Iteration_TC(Algorithm):
         """
         Handles the iteration for the transcritical case with robust convergence and plotting.
         """
+        def get_evaporator_error(p1_guess, p2_current, flowsheet, inputs, fs_state):
+            try:
+                error_eva, _, _, _ = flowsheet.calculate_cycle_for_pressures(
+                    p_1=p1_guess,
+                    p_2=p2_current,
+                    inputs=inputs,
+                    fs_state=fs_state
+                )
+                return error_eva
+            except Exception as e:
+                logger.debug(f"Error calculating evaporator error at p1={p1_guess/1e5:.2f} bar: {e}")
+                return 1e6
+
         p_1 = p_1_start
         p_2 = p_2_start
         step_p2_bar = 5.0
@@ -151,12 +165,90 @@ class Iteration_TC(Algorithm):
                     plt.close(fig_iterations)
                 return None
 
+            try:
+                p1_min_guess = flowsheet.med_prop.calc_state("TQ", inputs.evaporator.T_in - 20, 0).p
+                p1_max_guess = flowsheet.med_prop.calc_state("TQ", inputs.evaporator.T_in - 1, 0).p
+            except Exception:
+                p1_min_guess, p1_max_guess = 10e5, 40e5 # Fallback values if calculation fails
+
             p_1_stable = False
+            try:
+                p1_solution = brentq(
+                    get_evaporator_error, a=p1_min_guess, b=p1_max_guess,
+                    args=(p_2, flowsheet, inputs, fs_state),
+                    xtol=100, maxiter=100
+                )
+                p_1 = p1_solution
+                p_1_stable = True
+                logger.info(f"Inner loop converged for p_2={p_2 * 1e-5:.2f} bar. Final p_1={p_1 * 1e-5:.2f} bar.")
+            except ValueError:
+                logger.warning(f"brentq could not find a stable p_1 for p_2={p_2 * 1e-5:.2f} bar. Trying next p2.")
+
+            if p_1_stable:
+                error_eva, dT_min_eva, error_con, dT_min_con = flowsheet.calculate_cycle_for_pressures(
+                    p_1=p_1, p_2=p_2, inputs=inputs, fs_state=fs_state
+                )
+                Q_con = flowsheet.condenser.calc_Q_flow()
+                P_el = flowsheet.calc_electrical_power(fs_state=fs_state, inputs=inputs)
+                current_cop = Q_con / P_el if P_el > 0 else np.nan
+
+                current_values = [p_1 * 1e-5, p_2 * 1e-5, current_cop, error_eva, error_con, dT_min_eva, dT_min_con]
+                all_histories = [p_1_history, p_2_history, cop_history, error_eva_history, error_con_history,
+                                 dT_eva_history, dT_con_history]
+                for lst, val in zip(all_histories, current_values):
+                    lst.append(val)
+
+                if self.show_iteration:
+                    plot_data_map = {
+                        0: error_eva_history,
+                        1: error_con_history,
+                        3: cop_history,
+                        4: dT_con_history,
+                        5: dT_eva_history,
+                        6: p_1_history,
+                        7: p_2_history
+                    }
+                    plot_window = 30
+                    total_steps = len(p_1_history)
+                    iterations_to_plot = range(max(0, total_steps - plot_window), total_steps)
+                    for i, ax in enumerate(ax_iterations.flatten()):
+                        if i in plot_data_map:
+                            ax.cla()
+                            # Nur plotten, wenn die History-Liste nicht leer ist!
+                            if plot_data_map[i]:
+                                ax.plot(iterations_to_plot, plot_data_map[i][-plot_window:], 'o-', markersize=2)
+                            ax.grid(True)
+                    for i, row in enumerate(ax_iterations):
+                        for j, ax in enumerate(row):
+                            ax.set_ylabel(ax_labels[i][j])
+                            if i == 2: ax.set_xlabel("Total Iteration Step")
+                    plt.tight_layout(pad=2.0)
+                    plt.pause(0.01)
+
+                final_cop_for_this_p2 = current_cop
+                if final_cop_for_this_p2 > best_cop:
+                    best_cop = final_cop_for_this_p2
+                    best_p2 = p_2
+                    best_p1 = p_1
+
+                if abs(error_con) > 1.0:
+                    logger.warning(f"p1 is stable, but gas cooler error is high ({error_con:.2f}%) for p2 {p_2 * 1e-5:.2f} bar. Penalizing this point.")
+                    final_cop_for_this_p2 = -1.0
+
+            else:
+                logger.warning(f"Inner loop (brentq) failed for p_2 = {p_2 * 1e-5:.2f} bar. Treating as bad point.")
+                final_cop_for_this_p2 = -np.inf
+
+            last_converged_cop = final_cop_for_this_p2
+            last_p2_bar = p_2 * 1e5
+
+
+            '''p_1_stable = False
             step_p1 = self.step_max
             min_step_p1 = 10
             error_eva_history_inner = [np.nan]
 
-            for i_inner in range(100):
+            for i_inner in range(3000):
                 try:
                     error_eva, dT_min_eva, error_con, dT_min_con = flowsheet.calculate_cycle_for_pressures(
                         p_1=p_1,
@@ -224,7 +316,7 @@ class Iteration_TC(Algorithm):
                     p_1_stable = True
                     break  # Schleife hier verlassen
 
-                p_1 += np.sign(error_eva) * step_p1
+                p_1 += np.sign(error_eva) * step_p1'''
 
             if not p_1_stable:
                 logger.warning(
