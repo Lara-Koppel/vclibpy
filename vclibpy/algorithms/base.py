@@ -130,11 +130,11 @@ class Algorithm(abc.ABC):
             t_e_start_celsius = flowsheet.med_prop.calc_state('PQ', p_1_start, 0).T - 273.15
             p_2_start_bar = ((2.778 - 0.0157 * t_e_start_celsius) * t_c_estimate_celsius + (0.381 * t_e_start_celsius - 9.34))
 
-            if p_2_start_bar > p_crit:
+            if p_2_start_bar > p_crit_bar:
                 p_2_start = p_2_start_bar * 1e5
                 logger.info(f"Set p2 to calculated value of {p_2_start_bar:.2f} bar (Liao et al. 2000)")
             else:
-                p_2_start = (p_crit_bar + 50) * 1e5
+                p_2_start = (p_crit_bar + 40) * 1e5
                 logger.warning(f"Calculated p2 ({p_2_start_bar:.2f} bar) is below critical pressure ({p_crit / 1e5:.2f} bar. Therefore initial pressure p2 was set to {p_2_start / 1e5:.2f} bar.")
 
         else:
