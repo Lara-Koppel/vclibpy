@@ -133,15 +133,15 @@ class Iteration_TC(Algorithm):
             plt.ion()
             fig_iterations, ax_iterations = plt.subplots(3, 3, figsize=(15, 9), sharex=True)
             ax_labels = [
-                ("error_eva in %", "error_con in %", ""), # Last plot is empty on purpose
+                ("error_eva in %", "error_con in %", ""),
                 ("COP in -", "$\Delta T_\mathrm{Min, Con}$ in K", "$\Delta T_\mathrm{Min, Eva}$ in K"),
-                ("$p_1$ in bar", "$p_2$ in bar", "")  # Last plot is empty on purpose
+                ("$p_1$ in bar", "$p_2$ in bar", "")
             ]
             for i, row in enumerate(ax_iterations):
                 for j, ax in enumerate(row):
                     ax.set_ylabel(ax_labels[i][j])
                     ax.grid(True)
-                    if i == 2: ax.set_xlabel("Total Iteration Step")
+                    if i == 2: ax.set_xlabel("Total Outer Iteration Step")
             plt.tight_layout(pad=2.0)
 
         for i_outer in range(150):
@@ -176,7 +176,7 @@ class Iteration_TC(Algorithm):
                 p1_solution = brentq(
                     get_evaporator_error, a=p1_min_guess, b=p1_max_guess,
                     args=(p_2, flowsheet, inputs, fs_state),
-                    xtol=100, maxiter=100
+                    xtol=100, maxiter=300
                 )
                 p_1 = p1_solution
                 p_1_stable = True
@@ -190,222 +190,89 @@ class Iteration_TC(Algorithm):
                 )
                 Q_con = flowsheet.condenser.calc_Q_flow()
                 P_el = flowsheet.calc_electrical_power(fs_state=fs_state, inputs=inputs)
-                current_cop = Q_con / P_el if P_el > 0 else np.nan
-
-                current_values = [p_1 * 1e-5, p_2 * 1e-5, current_cop, error_eva, error_con, dT_min_eva, dT_min_con]
-                all_histories = [p_1_history, p_2_history, cop_history, error_eva_history, error_con_history,
-                                 dT_eva_history, dT_con_history]
-                for lst, val in zip(all_histories, current_values):
-                    lst.append(val)
-
-                if self.show_iteration:
-                    plot_data_map = {
-                        0: error_eva_history,
-                        1: error_con_history,
-                        3: cop_history,
-                        4: dT_con_history,
-                        5: dT_eva_history,
-                        6: p_1_history,
-                        7: p_2_history
-                    }
-                    plot_window = 30
-                    total_steps = len(p_1_history)
-                    iterations_to_plot = range(max(0, total_steps - plot_window), total_steps)
-                    for i, ax in enumerate(ax_iterations.flatten()):
-                        if i in plot_data_map:
-                            ax.cla()
-                            # Nur plotten, wenn die History-Liste nicht leer ist!
-                            if plot_data_map[i]:
-                                ax.plot(iterations_to_plot, plot_data_map[i][-plot_window:], 'o-', markersize=2)
-                            ax.grid(True)
-                    for i, row in enumerate(ax_iterations):
-                        for j, ax in enumerate(row):
-                            ax.set_ylabel(ax_labels[i][j])
-                            if i == 2: ax.set_xlabel("Total Iteration Step")
-                    plt.tight_layout(pad=2.0)
-                    plt.pause(0.01)
-
-                final_cop_for_this_p2 = current_cop
-                if final_cop_for_this_p2 > best_cop:
-                    best_cop = final_cop_for_this_p2
-                    best_p2 = p_2
-                    best_p1 = p_1
+                final_cop_for_this_p2 = Q_con / P_el if P_el > 0 else np.nan
 
                 if abs(error_con) > 1.0:
                     logger.warning(f"p1 is stable, but gas cooler error is high ({error_con:.2f}%) for p2 {p_2 * 1e-5:.2f} bar. Penalizing this point.")
                     final_cop_for_this_p2 = -1.0
 
             else:
-                logger.warning(f"Inner loop (brentq) failed for p_2 = {p_2 * 1e-5:.2f} bar. Treating as bad point.")
+                error_eva, dT_min_eva, error_con, dT_min_con = (np.nan, np.nan, np.nan, np.nan)
                 final_cop_for_this_p2 = -np.inf
-
-            last_converged_cop = final_cop_for_this_p2
-            last_p2_bar = p_2 * 1e5
+                logger.warning(f"Inner loop (brentq) failed for p_2 = {p_2 * 1e-5:.2f} bar. Treating as bad point.")
 
 
-            '''p_1_stable = False
-            step_p1 = self.step_max
-            min_step_p1 = 10
-            error_eva_history_inner = [np.nan]
+            current_values = [p_1 * 1e-5, p_2 * 1e-5, final_cop_for_this_p2, error_eva, error_con, dT_min_eva, dT_min_con]
+            all_histories = [p_1_history, p_2_history, cop_history, error_eva_history, error_con_history,
+                                 dT_eva_history, dT_con_history]
+            for lst, val in zip(all_histories, current_values):
+                lst.append(val)
 
-            for i_inner in range(3000):
-                try:
-                    error_eva, dT_min_eva, error_con, dT_min_con = flowsheet.calculate_cycle_for_pressures(
-                        p_1=p_1,
-                        p_2=p_2,
-                        inputs=inputs,
-                        fs_state=fs_state
-                    )
-                    Q_con = flowsheet.condenser.calc_Q_flow();
-                    P_el = flowsheet.calc_electrical_power(fs_state=fs_state, inputs=inputs)
-                    current_cop = Q_con / P_el if P_el > 0 else np.nan
+            if self.show_iteration:
+                plot_data_map = {
+                    0: error_eva_history,
+                    1: error_con_history,
+                    3: cop_history,
+                    4: dT_con_history,
+                    5: dT_eva_history,
+                    6: p_1_history,
+                    7: p_2_history
+                }
+                plot_window = 30
+                total_steps = len(p_1_history)
+                iterations_to_plot = range(max(0, total_steps - plot_window), total_steps)
+                for i, ax in enumerate(ax_iterations.flatten()):
+                    if i in plot_data_map:
+                        ax.cla()
+                        # Nur plotten, wenn die History-Liste nicht leer ist!
+                        if plot_data_map[i]:
+                            ax.plot(iterations_to_plot, plot_data_map[i][-plot_window:], 'o-', markersize=2)
+                        ax.grid(True)
+                for i, row in enumerate(ax_iterations):
+                    for j, ax in enumerate(row):
+                        ax.set_ylabel(ax_labels[i][j])
+                        if i == 2: ax.set_xlabel("Total Outer Iteration Step")
+                plt.tight_layout(pad=2.0)
+                plt.pause(0.01)
 
-                except Exception:
-                    p_1 += min_step_p1
-                    continue
-
-
-                current_values = [p_1 * 1e-5, p_2 * 1e-5, current_cop, error_eva, error_con, dT_min_eva, dT_min_con]
-                all_histories = [p_1_history, p_2_history, cop_history, error_eva_history, error_con_history, dT_eva_history,
-                                 dT_con_history]
-                for lst, val in zip(all_histories, current_values): lst.append(val)
-
-                if self.show_iteration:
-                    plot_data_map = {
-                        0: error_eva_history,
-                        1: error_con_history,
-                        3: cop_history,
-                        4: dT_con_history,
-                        5: dT_eva_history,
-                        6: p_1_history,
-                        7: p_2_history
-                    }
-                    plot_window = 30
-                    total_steps = len(p_1_history)
-                    iterations_to_plot = range(max(0, total_steps - plot_window), total_steps)
-                    for i, ax in enumerate(ax_iterations.flatten()):
-                        if i in plot_data_map:
-                            ax.cla()
-                            # Nur plotten, wenn die History-Liste nicht leer ist!
-                            if plot_data_map[i]:
-                                ax.plot(iterations_to_plot, plot_data_map[i][-plot_window:], 'o-', markersize=2)
-                            ax.grid(True)
-                    for i, row in enumerate(ax_iterations):
-                        for j, ax in enumerate(row):
-                            ax.set_ylabel(ax_labels[i][j])
-                            if i == 2: ax.set_xlabel("Total Iteration Step")
-                    plt.tight_layout(pad=2.0)
-                    plt.pause(0.01)
-
-
-                error_eva_abs = abs(error_eva)
-
-                gain_1_p1 = 5e5
-                gain_2_p1 = 3e5
-
-                if error_eva_abs > 10:
-                    step_p1 = abs(error_eva_abs / 100) * gain_2_p1
-                elif error_eva_abs < 10:
-                    step_p1 = abs(error_eva_abs / 100) * gain_1_p1
-
-                step_p1 = np.clip(step_p1, min_step_p1, self.step_max)
-
-                if abs(error_eva) < 1e-3 or (i_inner > 0 and step_p1 <= min_step_p1):
-                    logger.info(
-                        f"Inner loop converged for p_2={p_2 * 1e-5:.2f} bar after {i_inner + 1} steps. Final p_1={p_1 * 1e-5:.2f} bar.")
-                    p_1_stable = True
-                    break  # Schleife hier verlassen
-
-                p_1 += np.sign(error_eva) * step_p1'''
-
-            if not p_1_stable:
-                logger.warning(
-                    f"Inner loop for p_1 did not converge for p_2 = {p_2 * 1e-5:.2f} bar. Stopping outer loop.")
-
-
-                if self.save_path_plots:
-                    logger.info("Saving iteration history before exiting due to error...")
-                    df_history = pd.DataFrame({
-                        "p_1_bar": p_1_history,
-                        "p_2_bar": p_2_history,
-                        "error_con_percent": error_con_history,
-                        "error_eva_percent": error_eva_history,
-                        "dT_con_K": dT_con_history,
-                        "dT_eva_K": dT_eva_history,
-                        "cop": cop_history
-                    })
-                    filepath = self.save_path_plots.joinpath(f"{inputs.get_name()}_FAILED_TC_history.csv")
-                    df_history.to_csv(filepath, sep=';', decimal=',', index_label="Iteration")
-                    logger.info(f"Failed iteration history saved to {filepath}")
-
-
-                if self.show_iteration and self.save_path_plots:
-                    fig_iterations.savefig(
-                        self.save_path_plots.joinpath(f"{inputs.get_name()}_convergence_plot_FAILED.png"))
-                if self.show_iteration: plt.close(fig_iterations)
-                return None
-
-
-            final_cop_for_this_p2 = cop_history[-1] if cop_history else np.nan
-
-            if final_cop_for_this_p2 > best_cop:
-                best_cop = final_cop_for_this_p2
-                best_p2 = p_2
-                best_p1 = p_1
-
-            final_error_con_for_this_p2 = error_con_history[-1] if error_con_history else np.nan
-
-
-            if abs(final_error_con_for_this_p2) > 1.0:
-                logger.warning(f"p1 is stable, but condenser error is high ({final_error_con_for_this_p2:.2f}%) "
-                               f"for p2={p_2 * 1e-5:.2f} bar. Penalizing this point.")
-                final_cop_for_this_p2 = -1.0
-
-
-            final_cop_for_this_p2 = cop_history[-1] if cop_history else np.nan
-
-            '''
-            min_pinch_spec = 3.0
-            if dT_min_con < min_pinch_spec:
-                final_cop_for_this_p2 = -1.0
-            '''
+            if p_1_stable and abs(error_eva) < 1e-3:
+                if final_cop_for_this_p2 > best_cop:
+                    best_cop = final_cop_for_this_p2
+                    best_p2 = p_2
+                    best_p1 = p_1
+            elif p_1_stable:
+                logger.warning(f"Point at p2={p_2 / 1e5:.2f} bar is numerically stable but physically inconsistent (eva_err={error_eva:.3f}%). Discarding.")
 
             warning_zone_pressure = p_2_min_limit + 2e5
-            if p_2 < warning_zone_pressure:
-                final_cop_for_this_p2 = -1.0
-
-
             if p_2 < (warning_zone_pressure + step_p2_bar * 1e5):
                 step_p2_bar = max(step_p2_bar / 3, min_step_p2_bar)
-                logging.info(f"Approaching critical zone, reducing p2 step size to {step_p2_bar:.2f} bar.")
+                logger.info(f"Closing in on pressure limit. Reducing step size to {step_p2_bar:.2f} bar.")
 
+            p2_bar_current = p_2 / 1e5
 
-            p2_bar_current = p_2 * 1e-5
-            if not np.isnan(last_p2_bar):
+            if i_outer == 0:
+                p_2 += step_p2_bar * 1e5
+            else:
+                p2_bar_current = p_2 * 1e-5
                 delta_p2 = p2_bar_current - last_p2_bar
-                local_differential = (final_cop_for_this_p2 - last_converged_cop) / delta_p2 if abs(
-                    delta_p2) > 1e-9 else 0
+                local_differential = (final_cop_for_this_p2 - last_converged_cop) / delta_p2 if abs(delta_p2) > 1e-9 else 0
                 differential_history.append(local_differential)
 
-                if len(differential_history) > 1 and np.sign(differential_history[-1]) != np.sign(
-                        differential_history[-2]):
-                    logger.info(
-                        f"Optimum überschritten. Springe zu bestem p2={best_p2 / 1e5:.2f} bar zurück und verfeinere Suche.")
-
+                if len(differential_history) > 1 and np.sign(differential_history[-1]) != np.sign(differential_history[-2]):
+                    logger.info(f"Exceeded optimum. Jumping back to best p2={best_p2 / 1e5:.2f} bar and refining search.")
                     p_2 = best_p2
                     p_1 = best_p1
-
-                    # Schrittweite reduzieren für die Feinsuche
                     step_p2_bar = max(step_p2_bar / 3, min_step_p2_bar)
-
-                    # Setze den 'letzten' Zustand zurück, um falsche Berechnungen zu vermeiden
                     last_converged_cop = best_cop
                     last_p2_bar = best_p2 / 1e5
-                    differential_history.clear()  # Historie leeren für sauberen Neustart der Feinsuche
+                    differential_history.clear()
 
-                if step_p2_bar <= min_step_p2_bar:
-
+                elif step_p2_bar <= min_step_p2_bar and not np.isnan(best_p2):
                     logger.info("Outer loop converged: p_2 step size is below tolerance.")
+                    p_1 = best_p1
+                    p_2 = best_p2
+
+                    logger.info(f"Returning best valid state found at p2={p_2/1e5:.2f} bar with p1={p_1/1e5:.2f} bar.")
 
                     final_state = flowsheet.calculate_outputs_for_valid_pressures(
                         p_1=p_1,
@@ -414,7 +281,6 @@ class Iteration_TC(Algorithm):
                         fs_state=fs_state,
                         save_path_plots=self.save_path_plots
                     )
-
                     if self.save_path_plots:
                         p_1_history.append(p_1 / 1e5)
                         p_2_history.append(p_2 / 1e5)
@@ -439,23 +305,20 @@ class Iteration_TC(Algorithm):
                         plt.close(fig_iterations)
 
                     flowsheet.iteration_converged = True
-                    fs_state.set(name="converged", value=1, unit="-")
-
-
                     return final_state
-
-                p_2 += np.sign(
-                    local_differential) * step_p2_bar * 1e5 if local_differential != 0 else -step_p2_bar * 1e5
-            else:
-                p_2 -= step_p2_bar * 1e5
+                else:
+                    p_2 += np.sign(local_differential) * step_p2_bar * 1e5 if local_differential != 0 else step_p2_bar * 1e5
 
             last_converged_cop = final_cop_for_this_p2
             last_p2_bar = p2_bar_current
 
+
+
         logger.warning("Breaking: Max outer iterations reached.")
         if self.show_iteration and self.save_path_plots:
             fig_iterations.savefig(self.save_path_plots.joinpath(f"{inputs.get_name()}_convergence_plot_MAX_ITER.png"))
-        if self.show_iteration: plt.close(fig_iterations)
+        if self.show_iteration:
+            plt.close(fig_iterations)
         return None
 
     def calc_steady_state(
