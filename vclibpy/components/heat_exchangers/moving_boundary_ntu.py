@@ -260,9 +260,9 @@ class MovingBoundaryNTUGasCooler(ExternalHeatExchanger):
                 location_desc = f"Inside gas cooler at approx. {pinch_position_percent:.2f}% of heat exchange"
 
             return (
-                f" Pinch point location: {location_desc}\n"
-                f" Pinch enthalpy: {pinch_enthalpy / 1000:.2f} kJ/kg\n"
-                f" Final dT_min: {dT_min:.2f} K"
+                f"Pinch point location: {location_desc}\n"
+                f"Pinch enthalpy: {pinch_enthalpy / 1000:.2f} kJ/kg\n"
+                f"Final dT_min: {dT_min:.2f} K"
             )
         except Exception as e:
             return f"Error during pinch point analysis: {str(e)}"
