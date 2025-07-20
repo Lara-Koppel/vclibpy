@@ -166,10 +166,11 @@ class Iteration_TC(Algorithm):
                 return None
 
             try:
-                p1_min_guess = flowsheet.med_prop.calc_state("TQ", inputs.evaporator.T_in - 20, 0).p
-                p1_max_guess = flowsheet.med_prop.calc_state("TQ", inputs.evaporator.T_in - 1, 0).p
+                p1_min_guess = flowsheet.med_prop.calc_state("TQ", inputs.evaporator.T_in - 40, 0).p
+                p1_max_guess = flowsheet.med_prop.calc_state("TQ", inputs.evaporator.T_in + 10, 0).p
             except Exception:
-                p1_min_guess, p1_max_guess = 10e5, 40e5 # Fallback values if calculation fails
+                p_crit_eva = flowsheet.med_prop.calc_state("TQ", inputs.evaporator.T_in, 0).p
+                p1_min_guess, p1_max_guess = 0.5 * p_crit_eva, 0.98 * p_crit_eva
 
             p_1_stable = False
             try:
@@ -247,6 +248,13 @@ class Iteration_TC(Algorithm):
             if p_2 < (warning_zone_pressure + step_p2_bar * 1e5):
                 step_p2_bar = max(step_p2_bar / 3, min_step_p2_bar)
                 logger.info(f"Closing in on pressure limit. Reducing step size to {step_p2_bar:.2f} bar.")
+
+            if i_outer > 10 and np.isnan(best_p2):
+                logger.error("Could not find any stable operating point after 10 attempts. "
+                             "The given inputs likely describe a physically impossible process (e.g., undersized heat exchanger). Stopping.")
+                if self.show_iteration:
+                    plt.close(fig_iterations)
+                return None
 
             p2_bar_current = p_2 / 1e5
 
