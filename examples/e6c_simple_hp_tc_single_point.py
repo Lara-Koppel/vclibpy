@@ -5,10 +5,9 @@ def calculate_single_point():
     from vclibpy.flowsheets import StandardCycleTranscritical
     from vclibpy.components.heat_exchangers import moving_boundary_ntu
     from vclibpy.components.heat_exchangers import heat_transfer
-    from vclibpy.algorithms.iteration_tc_cop_optimizer import Iteration_TC_COP_Optimizer
 
     condenser = moving_boundary_ntu.MovingBoundaryNTUGasCooler(
-        A=40,
+        A=80,
         secondary_medium="air",
         flow_type="counter",
         ratio_outer_to_inner_area=10,
@@ -34,8 +33,9 @@ def calculate_single_point():
 
     from vclibpy.components.compressors import RotaryCompressor
     compressor = RotaryCompressor(
-        N_max=95,
-        V_h=19e-6
+        N_max=125,
+        V_h=19e-6,
+        eta_is_const = 0.75
     )
 
     # Now, we can plug everything into the flowsheet:
@@ -60,9 +60,9 @@ def calculate_single_point():
     print(f"Info: Result-folder for this run created: {timestamped_save_path}")
 
     algorithm = Iteration_TC(raise_errors=True, save_path_plots=timestamped_save_path, show_iteration=True)
-    speed_control = RelativeCompressorSpeedControl(0.8, 5.0, 0)
-    eva_inputs = HeatExchangerInputs(T_in=-0 + 273.15, m_flow=1)
-    con_inputs = HeatExchangerInputs(T_in=35 + 273.15, m_flow=1)
+    speed_control = RelativeCompressorSpeedControl(0.2, 5.0, 0)
+    eva_inputs = HeatExchangerInputs(T_in=5 + 273.15, m_flow=1)
+    con_inputs = HeatExchangerInputs(T_in=28 + 273.15, m_flow=1)
     inputs = Inputs(control=speed_control, evaporator=eva_inputs, condenser=con_inputs)
 
     start_time = time.perf_counter()
@@ -70,8 +70,8 @@ def calculate_single_point():
 
     fs_state = algorithm.calc_steady_state(flowsheet, inputs, "CarbonDioxide")
 
-    end_zeit = time.perf_counter()
-    duration_seconds = end_zeit - start_time
+    end_time = time.perf_counter()
+    duration_seconds = end_time - start_time
 
     # Following code is for output and csv export of the results
     if fs_state is not None:
