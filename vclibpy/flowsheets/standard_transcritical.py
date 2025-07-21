@@ -70,7 +70,7 @@ class StandardCycleTranscritical(BaseCycle):
         p = self.condenser.state_inlet.p
         h_in = self.condenser.state_inlet.h
         h_out = self.condenser.state_outlet.h
-        h_steps = numpy.linspace(h_in, h_out, 20)
+        h_steps = numpy.linspace(h_in, h_out, 50)
 
         for h_val in h_steps:
             inter_state = self.med_prop.calc_state("PH", p, h_val)
@@ -174,9 +174,9 @@ class StandardCycleTranscritical(BaseCycle):
         self.evaporator.m_flow = self.compressor.m_flow
         self.expansion_valve.m_flow = self.compressor.m_flow
 
-        # Wir definieren eine "Zielfunktion", die den Kondensatorfehler zurückgibt.
-        # Der Solver wird den Input dieser Funktion (T_3_guess) so lange ändern,
-        # bis der Output (error) null ist.
+        # We define a function that returns the gas cooler error.
+        # The solver will change the input of this function (T_3_guess)
+        # until the output (error) is zero.
         def get_condenser_error(T_3_guess_array):
             T_3_guess = T_3_guess_array[0]
             self.condenser.state_outlet = self.med_prop.calc_state("PT", p_2, T_3_guess)
@@ -201,62 +201,6 @@ class StandardCycleTranscritical(BaseCycle):
 
         except Exception as e:
             raise ValueError("fsolve_condenser_did_not_converge") from e
-
-
-        # iterate the condenser outlet temperature based on energy balance
-        max_err_q = 0.5
-        error_history = []
-        step_pinch_point = 1
-        min_step_pinch_point = 0.001
-        pinch_point = 3    # Starting pinch point in K
-        self.condenser.state_outlet = self.set_condenser_outlet_based_on_pinch_point(p_2=p_2, inputs=inputs, pinch_point=pinch_point)
-        # First iteration outside while loop to get the first error
-        error, dT_min = self.condenser.calc(inputs=inputs, fs_state=fs_state)
-        error_history.append(error)
-        # print(f"Error: {error}, T_con_out: {self.condenser.state_outlet.T}")
-        if error > 0:
-            pinch_point -= step_pinch_point
-        else:
-            pinch_point += step_pinch_point
-        self.condenser.state_outlet = self.set_condenser_outlet_based_on_pinch_point(p_2=p_2, inputs=inputs,
-                                                                                     pinch_point=pinch_point)
-        #print(f"Error: {error}, T_con_out: {self.condenser.state_outlet.T}")
-        while True:
-            error, dT_min = self.condenser.calc(inputs=inputs, fs_state=fs_state)
-            error_history.append(error)
-            # print(f"Error: {error}, T_con_out: {self.condenser.state_outlet.T}")
-
-            if numpy.sign(error_history[-1]) != numpy.sign(error_history[-2]):
-                step_pinch_point /= 10
-
-            if abs(error) > max_err_q or step_pinch_point > min_step_pinch_point:
-                if error > 0:
-                    pinch_point -= step_pinch_point
-                else:
-                    pinch_point += step_pinch_point
-                self.condenser.state_outlet = self.set_condenser_outlet_based_on_pinch_point(p_2=p_2, inputs=inputs, pinch_point=pinch_point)
-            else:
-                break
-
-
-        '''
-        # This is an alternative to the above iteration, which sets a fixed gas cooler outlet temperature
-        fixed_gas_cooler_outlet_temp = 36.4 + 273.15
-
-        try:
-            self.condenser.state_outlet = self.med_prop.calc_state("PT", p_2, fixed_gas_cooler_outlet_temp)
-            logging.info(f"Set gas cooler outlet temperature to {fixed_gas_cooler_outlet_temp} K at p={p_2/1e5:.2f} bar.")
-        except Exception as e_gc_fixed:
-            logging.error(f"Failed to set fixed gas cooler outlet temperature to: {fixed_gas_cooler_outlet_temp} K")
-            raise e_gc_fixed
-
-        try:
-            error, dT_min = self.condenser.calc(inputs=inputs, fs_state=fs_state)
-            logging.info(f"Calculated condenser error: {error}, dT_min: {dT_min}")
-        except Exception as e_gc_calc:
-            logging.error(f"Failed to calculate condenser state with fixed outlet temperature: {fixed_gas_cooler_outlet_temp} K")
-            raise e_gc_calc
-        '''
 
         self.expansion_valve.state_inlet = self.condenser.state_outlet
         self.expansion_valve.calc_outlet(p_outlet=p_1)
