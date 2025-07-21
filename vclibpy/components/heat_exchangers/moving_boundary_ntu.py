@@ -7,7 +7,7 @@ from vclibpy.components.heat_exchangers import ntu, ExternalHeatExchanger
 from vclibpy.components.heat_exchangers.utils import (separate_phases,
                                                       get_condenser_phase_temperatures_and_alpha,
                                                       get_gas_cooler_phase_temperatures)
-
+from vclibpy.components.heat_exchangers.heat_transfer.heat_transfer import HeatTransfer, TwoPhaseHeatTransfer
 logger = logging.getLogger(__name__)
 
 
@@ -159,6 +159,33 @@ class MovingBoundaryNTUGasCooler(ExternalHeatExchanger):
     See parent classes for arguments.
     """
 
+    def __init__(
+            self,
+            A: float,
+            wall_heat_transfer: HeatTransfer,
+            secondary_heat_transfer: HeatTransfer,
+            gas_heat_transfer: HeatTransfer,
+            liquid_heat_transfer: HeatTransfer,
+            two_phase_heat_transfer: TwoPhaseHeatTransfer,
+            secondary_medium: str,
+            ratio_outer_to_inner_area: float = 1,
+            flow_type: str = "counter",
+            steps: int = 20
+    ):
+        super().__init__(
+            A=A,
+            wall_heat_transfer=wall_heat_transfer,
+            secondary_heat_transfer=secondary_heat_transfer,
+            gas_heat_transfer=gas_heat_transfer,
+            liquid_heat_transfer=liquid_heat_transfer,
+            two_phase_heat_transfer=two_phase_heat_transfer,
+            secondary_medium=secondary_medium,
+            ratio_outer_to_inner_area=ratio_outer_to_inner_area,
+            flow_type=flow_type
+        )
+
+        self.steps = steps
+
     def calc(self, inputs: Inputs, fs_state: FlowsheetState) -> (float, float):
 
         self.m_flow_secondary = inputs.condenser.m_flow  # [kg/s]
@@ -172,9 +199,9 @@ class MovingBoundaryNTUGasCooler(ExternalHeatExchanger):
         self.T_out = T_out
 
         try:
-            steps = 20
-            h_steps = np.linspace(self.state_inlet.h, self.state_outlet.h, steps+1)
-            T_sec_steps = np.linspace(T_in, T_out, steps + 1)
+
+            h_steps = np.linspace(self.state_inlet.h, self.state_outlet.h, self.steps + 1)
+            T_sec_steps = np.linspace(T_in, T_out, self.steps + 1)
             T_ref_steps = [self.med_prop.calc_state("PH", self.state_inlet.p, h).T for h in h_steps]
         except ValueError:
             return 1e6, -100
@@ -190,7 +217,7 @@ class MovingBoundaryNTUGasCooler(ExternalHeatExchanger):
         tra_prop_med = self.calc_transport_properties_secondary_medium((T_in + T_out) / 2)
         alpha_med_wall = self.calc_alpha_secondary(tra_prop_med)
 
-        for i in range(steps):
+        for i in range(self.steps):
             state_in_seg = self.med_prop.calc_state("PH", self.state_inlet.p, h_steps[i])
             state_out_seg = self.med_prop.calc_state("PH", self.state_inlet.p, h_steps[i + 1])
             T_ref_in_seg = T_ref_steps[i]
@@ -217,7 +244,7 @@ class MovingBoundaryNTUGasCooler(ExternalHeatExchanger):
                 A_available=(self.A - A_used)
             )
 
-            if A_used + A_used_step >= self.A or i == steps - 1:
+            if A_used + A_used_step >= self.A or i == self.steps - 1:
                 A_used_step = max(0, self.A - A_used)
                 Q_ntu_step = ntu.calc_Q_ntu(
                     m_flow_primary_cp=self.m_flow * primary_cp,
@@ -241,9 +268,9 @@ class MovingBoundaryNTUGasCooler(ExternalHeatExchanger):
         Perform a pinch point analysis for the gas cooler.
         """
         try:
-            steps = 20
-            h_steps = np.linspace(self.state_inlet.h, self.state_outlet.h, steps + 1)
-            T_sec_steps = np.linspace(self.T_in, self.T_out, steps + 1)
+
+            h_steps = np.linspace(self.state_inlet.h, self.state_outlet.h, self.steps + 1)
+            T_sec_steps = np.linspace(self.T_in, self.T_out, self.steps + 1)
             T_ref_steps = [self.med_prop.calc_state("PH", self.state_inlet.p, h).T for h in h_steps]
 
             temp_diffs = np.array(T_ref_steps) - np.array(T_sec_steps[::-1])
@@ -253,10 +280,10 @@ class MovingBoundaryNTUGasCooler(ExternalHeatExchanger):
 
             if pinch_index == 0:
                 location_desc = "Gas cooler inlet (hot end)"
-            elif pinch_index == steps:
+            elif pinch_index == self.steps:
                 location_desc = "Gas cooler outlet (cold end)"
             else:
-                pinch_position_percent = (pinch_index / steps) * 100
+                pinch_position_percent = (pinch_index / self.steps) * 100
                 location_desc = f"Inside gas cooler at approx. {pinch_position_percent:.2f}% of heat exchange"
 
             return (
