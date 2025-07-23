@@ -110,7 +110,7 @@ class Iteration_TC(Algorithm):
 
         p_1 = p_1_start
         p_2 = p_2_start
-        p_2 = 75e5
+        p_2 = 80e5
         step_p2_bar = 5.0
         min_step_p2_bar = 0.1
         best_cop = -np.inf
