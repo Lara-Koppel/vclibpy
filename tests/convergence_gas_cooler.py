@@ -15,7 +15,7 @@ logging.basicConfig(level="INFO")
 
 
 def run_analysis():
-    steps_part1 = list(range(250, 1500, 10))
+    steps_part1 = list(range(51, 150, 1))
 
 
     steps_to_test = steps_part1
