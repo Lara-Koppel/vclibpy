@@ -221,7 +221,7 @@ class MovingBoundaryNTUGasCooler(ExternalHeatExchanger):
             state_in_seg = self.med_prop.calc_state("PH", self.state_inlet.p, h_steps[i])
             state_out_seg = self.med_prop.calc_state("PH", self.state_inlet.p, h_steps[i + 1])
             T_ref_in_seg = T_ref_steps[i]
-            T_sec_out_seg = T_sec_steps[i + 1]
+            T_sec_out_seg = T_sec_steps[::-1][i + 1]
             dT_max_seg = T_ref_in_seg - T_sec_out_seg
 
             if not np.isclose(state_in_seg.T, state_out_seg.T):
