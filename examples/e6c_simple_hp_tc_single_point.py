@@ -7,18 +7,20 @@ def calculate_single_point():
     from vclibpy.components.heat_exchangers import heat_transfer
 
     condenser = moving_boundary_ntu.MovingBoundaryNTUGasCooler(
-        A=80,
+        A=5.74,
+        d_i=0.00874,
+        num_tubes=4,
         secondary_medium="air",
         flow_type="counter",
         ratio_outer_to_inner_area=10,
         two_phase_heat_transfer=heat_transfer.constant.ConstantTwoPhaseHeatTransfer(alpha=1000),
-        gas_heat_transfer=heat_transfer.constant.ConstantHeatTransfer(alpha=1000),
+        gas_heat_transfer=heat_transfer.constant.ConstantHeatTransfer(alpha=55),
         wall_heat_transfer=heat_transfer.wall.WallTransfer(lambda_=236, thickness=2e-3),
         liquid_heat_transfer=heat_transfer.constant.ConstantHeatTransfer(alpha=5000),
-        secondary_heat_transfer=heat_transfer.constant.ConstantHeatTransfer(alpha=25)
+        secondary_heat_transfer=heat_transfer.constant.ConstantHeatTransfer(alpha=5000)
     )
     evaporator = moving_boundary_ntu.MovingBoundaryNTUEvaporator(
-        A=30,
+        A=10,
         secondary_medium="air",
         flow_type="counter",
         ratio_outer_to_inner_area=10,
@@ -147,6 +149,7 @@ def calculate_single_point():
         print(f"COP: {fs_state.get('COP').value}")
         print(f"Q_con: {fs_state.get('Q_con').value} W")
         print(f"P_el: {fs_state.get('P_el').value} W")
+        print(f"Calculated pressure drop in gas cooler: {fs_state.get('delta_p_gas_cooler').value:.2f} Pa")
         print(f"{flowsheet.condenser.pinch_point_analysis()}")
     else:
         print(

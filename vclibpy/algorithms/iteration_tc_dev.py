@@ -110,7 +110,7 @@ class Iteration_TC(Algorithm):
 
         p_1 = p_1_start
         p_2 = p_2_start
-        p_2 = 80e5
+        # p_2 = 80e5        # Can be set with code further down to "deactivate" COP optimization
         step_p2_bar = 5.0
         min_step_p2_bar = 0.1
         best_cop = -np.inf
@@ -248,7 +248,8 @@ class Iteration_TC(Algorithm):
             elif p_1_stable:
                 logger.warning(f"Point at p2={p_2 / 1e5:.2f} bar is numerically stable but physically inconsistent (eva_err={error_eva:.3f}%). Discarding.")
 
-            logger.info(f"Calculation for fixed pressure p2={p_2 / 1e5:.2f} bar finished.")
+            # This part can be activated if you want to "deactivate" the COP optimization, e.g. for convergence testing
+            '''logger.info(f"Calculation for fixed pressure p2={p_2 / 1e5:.2f} bar finished.")
             final_state = flowsheet.calculate_outputs_for_valid_pressures(
                 p_1=p_1,
                 p_2=p_2,
@@ -256,7 +257,7 @@ class Iteration_TC(Algorithm):
                 inputs=inputs,
                 save_path_plots=self.save_path_plots
             )
-            return final_state
+            return final_state'''
 
             warning_zone_pressure = p_2_min_limit + 2e5
             if p_2 < (warning_zone_pressure + step_p2_bar * 1e5):
