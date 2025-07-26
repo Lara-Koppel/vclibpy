@@ -4,8 +4,10 @@ import numpy as np
 
 from vclibpy.datamodels import FlowsheetState, Inputs
 from vclibpy.components.heat_exchangers import ntu, ExternalHeatExchanger
-from vclibpy.components.heat_exchangers.utils import separate_phases, get_condenser_phase_temperatures_and_alpha
-
+from vclibpy.components.heat_exchangers.utils import (separate_phases,
+                                                      get_condenser_phase_temperatures_and_alpha,
+                                                      get_gas_cooler_phase_temperatures)
+from vclibpy.components.heat_exchangers.heat_transfer.heat_transfer import HeatTransfer, TwoPhaseHeatTransfer
 logger = logging.getLogger(__name__)
 
 
@@ -146,6 +148,189 @@ class MovingBoundaryNTUCondenser(ExternalHeatExchanger):
                           dT_min_LatSH,
                           dT_min_out)
 
+class MovingBoundaryNTUGasCooler(ExternalHeatExchanger):
+    """
+    Condenser class which implements the actual `calc` method.
+
+    Assumptions:
+    - No phase changes in secondary medium
+    - cp of secondary medium is constant over heat-exchanger
+
+    See parent classes for arguments.
+    """
+
+    def __init__(
+            self,
+            A: float,
+            d_i: float,
+            num_tubes: int, #Number of parallel tubes
+            wall_heat_transfer: HeatTransfer,
+            secondary_heat_transfer: HeatTransfer,
+            gas_heat_transfer: HeatTransfer,
+            liquid_heat_transfer: HeatTransfer,
+            two_phase_heat_transfer: TwoPhaseHeatTransfer,
+            secondary_medium: str,
+            ratio_outer_to_inner_area: float = 1,
+            flow_type: str = "counter",
+            steps: int = 20
+    ):
+        super().__init__(
+            A=A,
+            wall_heat_transfer=wall_heat_transfer,
+            secondary_heat_transfer=secondary_heat_transfer,
+            gas_heat_transfer=gas_heat_transfer,
+            liquid_heat_transfer=liquid_heat_transfer,
+            two_phase_heat_transfer=two_phase_heat_transfer,
+            secondary_medium=secondary_medium,
+            ratio_outer_to_inner_area=ratio_outer_to_inner_area,
+            flow_type=flow_type
+        )
+
+        self.d_i = d_i
+        self.num_tubes = num_tubes
+        self.A_cross_section = (np.pi * d_i**2 / 4) * self.num_tubes
+        self.steps = steps
+
+    def calc(self, inputs: Inputs, fs_state: FlowsheetState) -> (float, float):
+
+        self.m_flow_secondary = inputs.condenser.m_flow  # [kg/s]
+
+        Q = (self.state_inlet.h - self.state_outlet.h) * self.m_flow
+        if np.isclose(Q, 0):
+            return 0.0, self.state_inlet.T - self.T_out
+        # Get secondary medium inlet and outlet temperatures
+        T_in, T_out = get_gas_cooler_phase_temperatures(inputs=inputs, Q=Q, heat_exchanger=self)
+        self.T_in = T_in
+        self.T_out = T_out
+
+        p_current = self.state_inlet.p
+        total_pressure_drop = 0.0
+        p_steps = [self.state_inlet.p]
+
+        try:
+
+            h_steps = np.linspace(self.state_inlet.h, self.state_outlet.h, self.steps + 1)
+            T_sec_steps = np.linspace(T_in, T_out, self.steps + 1)
+            # T_ref_steps = [self.med_prop.calc_state("PH", self.state_inlet.p, h).T for h in h_steps]
+        except ValueError:
+            return 1e6, -100
+
+        '''temp_diffs = np.array(T_ref_steps) - np.array(T_sec_steps[::-1])
+        dT_min = np.min(temp_diffs)
+
+        if dT_min < 0:
+            return abs(dT_min) * 1e4, dT_min'''
+
+        # inter_states = [self.med_prop.calc_state("PH", self.state_inlet.p, h_val) for h_val in h_steps]
+        Q_ntu, A_used = 0, 0
+        tra_prop_med = self.calc_transport_properties_secondary_medium((T_in + T_out) / 2)
+        alpha_med_wall = self.calc_alpha_secondary(tra_prop_med)
+
+        for i in range(self.steps):
+            state_in_seg = self.med_prop.calc_state("PH", p_current, h_steps[i])
+            state_out_seg = self.med_prop.calc_state("PH", p_current, h_steps[i + 1])
+            T_ref_in_seg = state_in_seg.T
+            T_sec_out_seg = T_sec_steps[::-1][i + 1]
+            dT_max_seg = T_ref_in_seg - T_sec_out_seg
+
+            if not np.isclose(state_in_seg.T, state_out_seg.T):
+                primary_cp = (state_in_seg.h - state_out_seg.h) / (state_in_seg.T - state_out_seg.T)
+            else:
+                primary_cp = np.inf
+
+            tra_prop_ref_con = self.med_prop.calc_mean_transport_properties(state_in_seg, state_out_seg)
+            alpha_ref_wall = self.calc_alpha_gas(tra_prop_ref_con)
+            k = self.calc_k(alpha_pri=alpha_ref_wall, alpha_sec=alpha_med_wall)
+            Q_required_seg = (state_in_seg.h - state_out_seg.h) * self.m_flow
+
+            _, A_used_step = ntu.calc_Q_with_available_area(
+                heat_exchanger=self,
+                m_flow_primary_cp=self.m_flow * primary_cp,
+                m_flow_secondary_cp=self.m_flow_secondary_cp,
+                Q_required=Q_required_seg,
+                k=k,
+                dT_max=dT_max_seg,
+                A_available=(self.A - A_used)
+            )
+
+            if A_used + A_used_step >= self.A or i == self.steps - 1:
+                A_used_step = max(0, self.A - A_used)
+                Q_ntu_step = ntu.calc_Q_ntu(
+                    m_flow_primary_cp=self.m_flow * primary_cp,
+                    m_flow_secondary_cp=self.m_flow_secondary_cp,
+                    k=k,
+                    dT_max=dT_max_seg,
+                    A=A_used_step,
+                    flow_type=self.flow_type
+                )
+            else:
+                Q_ntu_step = Q_required_seg
+
+            A_used += A_used_step
+            Q_ntu += Q_ntu_step
+
+            if A_used_step > 1e-9:
+                segment_length = A_used_step / (self.num_tubes * np.pi * self.d_i)
+
+                rho_mean = (state_in_seg.d + state_out_seg.d) / 2
+                eta_mean = (tra_prop_ref_con.dyn_vis)
+
+                velocity = self.m_flow / (rho_mean * self.A_cross_section)
+
+                Re = (rho_mean * velocity * self.d_i) / eta_mean
+
+                if Re > 2300:
+                    zeta = 0.3164 / (Re**0.25)
+
+                    delta_p = zeta * (segment_length / self.d_i) * (rho_mean * velocity**2 / 2)
+
+                    p_current -= delta_p
+                    total_pressure_drop += delta_p
+
+            p_steps.append(p_current)
+
+        self.T_ref_steps = [self.med_prop.calc_state("PH", p, h).T for p, h in zip(p_steps, h_steps)]
+        self.T_sec_steps = np.linspace(self.T_in, self.T_out, self.steps + 1)
+
+        temp_diffs = np.array(self.T_ref_steps) - np.array(self.T_sec_steps[::-1])
+        dT_min = np.min(temp_diffs)
+
+        error = (Q_ntu / Q - 1) * 100
+        fs_state.set(name="delta_p_gas_cooler", value=total_pressure_drop, unit="Pa",
+                     description="Total pressure drop in the gas cooler")
+        return error, dT_min
+
+    def pinch_point_analysis(self):
+        """
+        Perform a pinch point analysis for the gas cooler.
+        """
+        try:
+
+            h_steps = np.linspace(self.state_inlet.h, self.state_outlet.h, self.steps + 1)
+            T_sec_steps = np.linspace(self.T_in, self.T_out, self.steps + 1)
+            T_ref_steps = [self.med_prop.calc_state("PH", self.state_inlet.p, h).T for h in h_steps]
+
+            temp_diffs = np.array(T_ref_steps) - np.array(T_sec_steps[::-1])
+            dT_min = np.min(temp_diffs)
+            pinch_index = np.argmin(temp_diffs)
+            pinch_enthalpy = h_steps[pinch_index]
+
+            if pinch_index == 0:
+                location_desc = "Gas cooler inlet (hot end)"
+            elif pinch_index == self.steps:
+                location_desc = "Gas cooler outlet (cold end)"
+            else:
+                pinch_position_percent = (pinch_index / self.steps) * 100
+                location_desc = f"Inside gas cooler at approx. {pinch_position_percent:.2f}% of heat exchange"
+
+            return (
+                f"Pinch point location: {location_desc}\n"
+                f"Pinch enthalpy: {pinch_enthalpy / 1000:.2f} kJ/kg\n"
+                f"Final dT_min: {dT_min:.2f} K"
+            )
+        except Exception as e:
+            return f"Error during pinch point analysis: {str(e)}"
+
 
 class MovingBoundaryNTUEvaporator(ExternalHeatExchanger):
     """
@@ -199,6 +384,9 @@ class MovingBoundaryNTUEvaporator(ExternalHeatExchanger):
         T_sh = inputs.evaporator.T_in - Q_sh / self.m_flow_secondary_cp
         T_sc = T_sh - Q_lat / self.m_flow_secondary_cp
         T_out = T_sc - Q_sc / self.m_flow_secondary_cp
+
+        self.T_in = inputs.evaporator.T_in
+        self.T_out = T_out
 
         # 1. Regime: Superheating
         Q_sh_ntu, A_sh = 0, 0
