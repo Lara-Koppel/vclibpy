@@ -80,7 +80,7 @@ class BasePhaseSeparator(BaseCycle, abc.ABC):
         # High pressure EV
         self.high_pressure_valve.state_inlet = self.condenser.state_outlet
         self.high_pressure_valve.calc_outlet(p_outlet=p_phase_separator)
-        self.phase_separator.state_inlet = self.high_pressure_valve.state_outlet
+
 
         # Calculate low compressor stage to already have access to the mass flow rates.
         self.set_evaporator_outlet_based_on_superheating(p_eva=p_1, inputs=inputs)
