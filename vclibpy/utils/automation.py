@@ -3,6 +3,7 @@ Functions to generate HP Maps automatically
 """
 import logging
 import pathlib
+from pathlib import Path
 import os
 from typing import List, Union
 import multiprocessing
@@ -131,6 +132,7 @@ def full_factorial_map_generation(
         tuple (pathlib.Path, pathlib.Path):
             Path to the created .sdf file and to the .csv file
     """
+    save_path = Path(save_path)
     # Convert single values to arrays
     def ensure_array(x):
         if isinstance(x, (list, np.ndarray)):

@@ -82,18 +82,9 @@ class BasePhaseSeparator(BaseCycle, abc.ABC):
 
         # Calculate low compressor stage to already have access to the mass flow rates.
         self.set_evaporator_outlet_based_on_superheating(p_eva=p_1, inputs=inputs)
-        self.compressor.state_inlet = self.evaporator.state_outlet
-        self.compressor.calc_state_outlet(
-            p_outlet=p_2, inputs=inputs, fs_state=fs_state
-        )
-        m_flow_high = self.compressor.calc_m_flow(inputs=inputs, fs_state=fs_state)
-
 
         # Phase Separator component:
         x_phase_separator, h_vapor_phase_separator, state_low_ev_inlet, state_mid_ps_outlet = self.calc_separation()
-
-        self.evaporator.m_flow = self.compressor.m_flow * (1 - x_phase_separator)
-
         # Low pressure EV
         self.low_pressure_valve.state_inlet = state_low_ev_inlet
         self.low_pressure_valve.calc_outlet(p_outlet=p_1)
@@ -105,7 +96,7 @@ class BasePhaseSeparator(BaseCycle, abc.ABC):
 
         # Ideal Mixing of state_5 and state_1_VI:
         h_1_VI_mixed = (
-                (1-x_phase_separator) * self.evaporator.state_outlet.h +
+                (1 - x_phase_separator) * self.evaporator.state_outlet.h +
                 x_phase_separator * self.mid_pressure_valve.state_outlet.h
         )
         self.compressor.state_inlet = self.med_prop.calc_state(
@@ -114,15 +105,20 @@ class BasePhaseSeparator(BaseCycle, abc.ABC):
         self.compressor.calc_state_outlet(
             p_outlet=p_2, inputs=inputs, fs_state=fs_state
         )
+        # Set the state of the compressor inlet based on the phase separator outlet
+
+        m_flow_high = self.compressor.calc_m_flow(inputs=inputs, fs_state=fs_state)
+
+        self.evaporator.m_flow = self.compressor.m_flow * (1 - x_phase_separator)
 
         # Check m_flow of both compressor stages to check if
         # there would be an asymmetry of how much refrigerant is transported
-        #m_flow_high = self.high_pressure_compressor.calc_m_flow(
+        # m_flow_high = self.high_pressure_compressor.calc_m_flow(
         #    inputs=inputs, fs_state=fs_state
-        #)
-        #m_flow_low_should = m_flow_high * (1-x_vapor_injection)
-        #percent_deviation = (m_flow_low - m_flow_low_should) / m_flow_low_should * 100
-        #logger.debug("Deviation of mass flow rates is %s percent", percent_deviation)
+        # )
+        # m_flow_low_should = m_flow_high * (1-x_vapor_injection)
+        # percent_deviation = (m_flow_low - m_flow_low_should) / m_flow_low_should * 100
+        # logger.debug("Deviation of mass flow rates is %s percent", percent_deviation)
 
         # Set states
         self.condenser.m_flow = self.compressor.m_flow
