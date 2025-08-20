@@ -5,6 +5,7 @@ def main():
     # with a phase seperator.
     # We can import this flowsheet and how to use it like this:
     from vclibpy.flowsheets import BasePhaseSeparator
+    from pathlib import Path
     #help(VaporInjectionPhaseSeparator)
 
     # As it needs the same heat exchanger model as a standard heat pump,
@@ -49,7 +50,7 @@ def main():
     from vclibpy.components.compressors import RotaryCompressor
     compressor = RotaryCompressor(
         N_max=125,
-        V_h=19e-6
+        V_h=13.3e-6
     )
 
 
@@ -65,7 +66,8 @@ def main():
     )
     # As in the other example, we can specify save-paths,
     # solver settings and inputs to vary:
-    save_path = r"C:\Users\Lara\PycharmProjects\vclibpy\test10"
+    save_path = r"C:\Users\Lara\PycharmProjects\vclibpy\test"
+    save_path = Path(save_path)
     T_eva_in = [26 + 273.15]
     T_con = [28 + 273.15]
     n = [0.7, 1]

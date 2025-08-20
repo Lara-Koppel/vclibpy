@@ -5,6 +5,7 @@ def calculate_single_point():
     from vclibpy.flowsheets import StandardCycleTranscritical
     from vclibpy.components.heat_exchangers import moving_boundary_ntu
     from vclibpy.components.heat_exchangers import heat_transfer
+    from vclibpy.flowsheets import BasePhaseSeparator
 
     condenser = moving_boundary_ntu.MovingBoundaryNTUGasCooler(
         A=150,
@@ -31,7 +32,9 @@ def calculate_single_point():
         secondary_heat_transfer=heat_transfer.constant.ConstantHeatTransfer(alpha=25)
     )
     from vclibpy.components.expansion_valves import Bernoulli
-    expansion_valve = Bernoulli(A=0.1)
+    high_pressure_valve = Bernoulli(A=0.1)
+    low_pressure_valve = Bernoulli(A=0.1)
+    mid_pressure_valve = Bernoulli(A=0.1)
 
     from vclibpy.components.compressors import RotaryCompressor
     compressor = RotaryCompressor(
@@ -41,12 +44,14 @@ def calculate_single_point():
     )
 
     # Now, we can plug everything into the flowsheet:
-    flowsheet = StandardCycleTranscritical(
+    flowsheet = BasePhaseSeparator(
         evaporator=evaporator,
         condenser=condenser,
         fluid="CO2",
         compressor=compressor,
-        expansion_valve=expansion_valve,
+        high_pressure_valve=high_pressure_valve,
+        low_pressure_valve=low_pressure_valve,
+        mid_pressure_valve=mid_pressure_valve,
     )
 
     import logging

@@ -123,12 +123,12 @@ class Algorithm(abc.ABC):
         p_crit = _p_max
         p_crit_bar = _p_max / 1e5
 
-        #p_2_start = 130 * 1e5
+        p_2_start_bar = 90
 
         if flowsheet.flowsheet_name == "StandardTranscritical":
             t_c_estimate_celsius = inputs.condenser.T_in - 273.15 + self.dT_pinch_con_guess
             t_e_start_celsius = flowsheet.med_prop.calc_state('PQ', p_1_start, 0).T - 273.15
-            p_2_start_bar = ((2.778 - 0.0157 * t_e_start_celsius) * t_c_estimate_celsius + (0.381 * t_e_start_celsius - 9.34))
+            #p_2_start_bar = ((2.778 - 0.0157 * t_e_start_celsius) * t_c_estimate_celsius + (0.381 * t_e_start_celsius - 9.34))
 
             if p_2_start_bar > p_crit_bar:
                 p_2_start = p_2_start_bar * 1e5
