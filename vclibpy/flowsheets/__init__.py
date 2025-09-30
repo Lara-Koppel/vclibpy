@@ -4,3 +4,4 @@ from .standard_transcritical import StandardCycleTranscritical
 from .vapor_injection_economizer import VaporInjectionEconomizer
 from .vapor_injection_phase_separator import VaporInjectionPhaseSeparator
 from .phase_separator import BasePhaseSeparator
+from .phase_separator_transcritical import PhaseSeparatorTranscritical

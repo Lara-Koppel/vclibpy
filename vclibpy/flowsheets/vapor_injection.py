@@ -50,7 +50,7 @@ class BaseVaporInjection(BaseCycle, abc.ABC):
             self.low_pressure_valve,
         ]
 
-    def calc_states(self, p_1, p_2, inputs: Inputs, fs_state: FlowsheetState):
+    def calc_states(self, p_1, p_2, inputs: Inputs, fs_state: FlowsheetState, **kwargs):
         k_vapor_injection = inputs.control.get("k_vapor_injection", default=1)
         # Default according to Xu, 2019
 

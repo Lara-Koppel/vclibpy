@@ -5,7 +5,7 @@ def calculate_single_point():
     from vclibpy.flowsheets import StandardCycleTranscritical
     from vclibpy.components.heat_exchangers import moving_boundary_ntu
     from vclibpy.components.heat_exchangers import heat_transfer
-    from vclibpy.flowsheets import BasePhaseSeparator
+    from vclibpy.flowsheets import PhaseSeparatorTranscritical
 
     condenser = moving_boundary_ntu.MovingBoundaryNTUGasCooler(
         A=150,
@@ -38,13 +38,13 @@ def calculate_single_point():
 
     from vclibpy.components.compressors import RotaryCompressor
     compressor = RotaryCompressor(
-        N_max=200,
+        N_max=90,
         V_h=13.3e-6,
         eta_is_const = 0.75
     )
 
     # Now, we can plug everything into the flowsheet:
-    flowsheet = BasePhaseSeparator(
+    flowsheet = PhaseSeparatorTranscritical(
         evaporator=evaporator,
         condenser=condenser,
         fluid="CO2",
@@ -151,6 +151,8 @@ def calculate_single_point():
               f"Temperature secondary_inlet = {flowsheet.condenser.T_in}\n"
               f"Temperature secondary_outlet = {flowsheet.condenser.T_out}\n"
               )
+        if fs_state.get('p_mid'):
+            print(f"Optimal Intermediate Pressure: {fs_state.get('p_mid').value / 1e5:.2f} bar")
         print(f"COP: {fs_state.get('COP').value}")
         print(f"Q_con: {fs_state.get('Q_con').value} W")
         print(f"P_el: {fs_state.get('P_el').value} W")

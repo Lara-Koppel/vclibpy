@@ -90,7 +90,7 @@ class IHX(BaseCycle):
         else:
             self.ihx.state_outlet_low = self.med_prop.calc_state("PQ", p_eva, 1)
 
-    def calc_states(self, p_1, p_2, inputs: Inputs, fs_state: FlowsheetState):
+    def calc_states(self, p_1, p_2, inputs: Inputs, fs_state: FlowsheetState, **kwargs):
         # State 1
         self.set_ihx_outlet_based_on_superheating(p_eva=p_1, inputs=inputs)
         self.compressor.state_inlet = self.ihx.state_outlet_low

@@ -82,7 +82,7 @@ class BaseCycle:
         Returns:
             float: Initial guess for condensing pressure in Pa
         """
-        if self.flowsheet_name != "StandardTranscritical":
+        if self.flowsheet_name != ("StandardTranscritical" or "PhaseSeparatorTranscritical"):
             if inputs.condenser.uses_inlet:
                 T_3_start = inputs.condenser.T_in + inputs.control.dT_con_subcooling
             else:
@@ -104,7 +104,7 @@ class BaseCycle:
         Returns:
             float: Initial guess for evaporating pressure in Pa
         """
-        if self.flowsheet_name != "StandardTranscritical":
+        if self.flowsheet_name != ("StandardTranscritical" or "PhaseSeparatorTranscritical"):
             if inputs.evaporator.uses_inlet:
                 T_eva_in = inputs.evaporator.T_in
             else:
@@ -121,11 +121,11 @@ class BaseCycle:
 
         return p_1_start
 
-    def calculate_cycle_for_pressures(self, p_1: float, p_2: float, inputs: Inputs, fs_state: FlowsheetState):
+    def calculate_cycle_for_pressures(self, p_1: float, p_2: float, inputs: Inputs, fs_state: FlowsheetState, **kwargs):
         self.evaporator.calc_secondary_cp(T=inputs.evaporator.T)
         self.condenser.calc_secondary_cp(T=inputs.condenser.T)
         # Calculate the states based on the given flowsheet
-        self.calc_states(p_1, p_2, inputs=inputs, fs_state=fs_state)
+        self.calc_states(p_1, p_2, inputs=inputs, fs_state=fs_state, **kwargs)
         self.add_all_states_to_fs_state(inputs=inputs, fs_state=fs_state)
         # Check heat exchangers:
         error_eva, dT_min_eva = self.evaporator.calc(inputs=inputs, fs_state=fs_state)
@@ -246,9 +246,10 @@ class BaseCycle:
             p_2,
             fs_state: FlowsheetState,
             inputs: Inputs,
-            save_path_plots
+            save_path_plots,
+            **kwargs
     ):
-        self.calc_states(p_1, p_2, inputs=inputs, fs_state=fs_state)
+        self.calc_states(p_1, p_2, inputs=inputs, fs_state=fs_state, **kwargs)
         self.add_all_states_to_fs_state(inputs=inputs, fs_state=fs_state)
         error_con, dT_min_con = self.condenser.calc(inputs=inputs, fs_state=fs_state)
         error_eva, dT_min_eva = self.evaporator.calc(inputs=inputs, fs_state=fs_state)
@@ -364,7 +365,7 @@ class BaseCycle:
         raise NotImplementedError
 
     @abstractmethod
-    def calc_states(self, p_1, p_2, inputs: Inputs, fs_state: FlowsheetState):
+    def calc_states(self, p_1, p_2, inputs: Inputs, fs_state: FlowsheetState, **kwargs):
         """
         Function to calculate the states and mass flow rates of the flowsheet
         and set these into each component based on the given pressure levels p_1 and p_2.

@@ -49,7 +49,7 @@ class StandardCycle(BaseCycle):
             self.expansion_valve.state_outlet,
         ]
 
-    def calc_states(self, p_1, p_2, inputs: Inputs, fs_state: FlowsheetState):
+    def calc_states(self, p_1, p_2, inputs: Inputs, fs_state: FlowsheetState, **kwargs):
         """
         This function calculates the states of a standard heat pump under
         specific conditions while adhering to several general assumptions.

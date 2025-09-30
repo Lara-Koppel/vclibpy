@@ -102,7 +102,7 @@ class StandardCycleTranscritical(BaseCycle):
                                       "Condenser inlet temperature for secondary side needs to be provided.")
         return self.med_prop.calc_state("PT", p_2, T_in + pinch_point)
 
-    def calc_states(self, p_1, p_2, inputs: Inputs, fs_state: FlowsheetState):
+    def calc_states(self, p_1, p_2, inputs: Inputs, fs_state: FlowsheetState, **kwargs):
         """
         This function calculates the states of a standard heat pump under
         specific conditions while adhering to several general assumptions.

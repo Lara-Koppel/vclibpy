@@ -69,7 +69,7 @@ class BasePhaseSeparator(BaseCycle, abc.ABC):
             self.phase_separator,
         ]
 
-    def calc_states(self, p_1, p_2, inputs: Inputs, fs_state: FlowsheetState):
+    def calc_states(self, p_1, p_2, inputs: Inputs, fs_state: FlowsheetState, **kwargs):
         k_phase_separator = inputs.control.get("k_phase_separator", default=1)
         # Default according to Xu, 2019
 
